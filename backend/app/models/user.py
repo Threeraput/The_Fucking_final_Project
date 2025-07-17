@@ -40,6 +40,9 @@ class User(Base):
     teaching_classes = relationship("Class", back_populates="teacher", foreign_keys='Class.teacher_id')
     enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
     # ----------------------------------------------
+    
+    # User -> OTPs (One-to-Many)
+    otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"
