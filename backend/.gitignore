@@ -1,0 +1,17 @@
+# Virtual Environment
+.venv
+
+
+# Python environment files
+.env
+
+
+# Python bytecode
+*.pyc
+__pycache__/
+
+# IDE specific files
+.idea/                  # PyCharm
+.vscode/                # VS Code
+*.sublime-project       # Sublime Text
+*.sublime-workspace     # Sublime Text
