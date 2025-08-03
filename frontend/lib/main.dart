@@ -1,8 +1,12 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
-import 'services/auth_service.dart'; // เพื่อตรวจสอบสถานะ Login
+import 'screens/otp_verification_screen.dart'; 
+import 'screens/forgot_password_screen.dart'; 
+import 'screens/reset_password_screen.dart'; 
+import 'services/auth_service.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +17,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   final String initialRoute;
 
-  MyApp({required this.initialRoute});
+  const MyApp({super.key, required this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +29,25 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),
         '/home': (context) => HomeScreen(),
+        // แก้ไข Routes สำหรับ OtpVerificationScreen
+        '/verify-otp': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as String?;
+          if (args == null) {
+            // กรณีไม่มี email ส่งมา ให้กลับไปหน้า login หรือแสดง error
+            return LoginScreen(); // หรือ ErrorScreen()
+          }
+          // *** แก้ไขตรงนี้: เปลี่ยน identifier เป็น email ***
+          return OtpVerificationScreen(email: args);
+        },
+        '/forgot-password': (context) => ForgotPasswordScreen(),
+        '/reset-password': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as String?;
+          if (args == null) {
+            // กรณีไม่มี email ส่งมา ให้กลับไปหน้า forgot password
+            return ForgotPasswordScreen(); // หรือ ErrorScreen()
+          }
+          return ResetPasswordScreen(email: args);
+        },
       },
     );
   }

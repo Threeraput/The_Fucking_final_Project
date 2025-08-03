@@ -1,8 +1,12 @@
+// lib/screens/register_screen.dart
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
- // import User model if needed for response
+import '../models/users.dart'; // *** ตรวจสอบให้แน่ใจว่า import นี้มีอยู่และถูกต้อง ***
 
-class RegisterScreen extends StatefulWidget { 
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
   @override
   _RegisterScreenState createState() => _RegisterScreenState();
 }
@@ -44,9 +48,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     };
 
     try {
-      await AuthService.register(userData);
+      // --- ส่วนที่แก้ไข: รับค่า User ที่ลงทะเบียนสำเร็จกลับมา ---
+      User newUser = await AuthService.register(userData);
+      // --------------------------------------------------------
+
       setState(() {
-        _message = 'Registration successful! You can now log in.';
+        _message =
+            'Registration successful! An OTP has been sent to your email.'; // เปลี่ยนข้อความ
         _usernameController.clear();
         _passwordController.clear();
         _firstNameController.clear();
@@ -57,11 +65,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Registration successful! Redirecting to login...'),
+          content: Text(
+            'Registration successful! Please verify your email with OTP.',
+          ), // เปลี่ยนข้อความ
         ),
       );
       await Future.delayed(Duration(seconds: 2));
-      Navigator.of(context).pushReplacementNamed('/login');
+
+      // --- ส่วนที่แก้ไข: เปลี่ยนเส้นทางไปที่ '/verify-otp' และส่ง email ไปด้วย ---
+      Navigator.of(context).pushReplacementNamed(
+        '/verify-otp',
+        arguments: newUser
+            .email, // ส่งอีเมลไปเป็น argument เพื่อให้หน้า OTP รู้ว่าต้อง Verify ของใคร
+      );
+      // ----------------------------------------------------------------------
     } catch (e) {
       setState(() {
         _message = e.toString().replaceFirst('Exception: ', '');

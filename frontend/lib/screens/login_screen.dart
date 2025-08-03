@@ -1,7 +1,11 @@
+// lib/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -49,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextField(
               controller: _usernameController,
-              decoration: InputDecoration(labelText: ' Email'),
+              decoration: InputDecoration(labelText: 'Username or Email'),
             ),
             TextField(
               controller: _passwordController,
@@ -65,6 +69,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.all(8.0),
                 child: Text(_message!, style: TextStyle(color: Colors.red)),
               ),
+            // --- เพิ่มส่วนนี้สำหรับปุ่ม "Forgot Password?" ---
+            TextButton(
+              onPressed: () {
+                // เมื่อกดปุ่ม จะนำทางไปยังหน้า '/forgot-password'
+                Navigator.of(context).pushNamed('/forgot-password');
+              },
+              child: Text('Forgot Password?'),
+            ),
+            // --------------------------------------------------
             TextButton(
               onPressed: () {
                 Navigator.of(context).pushNamed('/register');
@@ -77,4 +90,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

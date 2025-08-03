@@ -1,14 +1,17 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:frontend/models/users.dart';
+import '../models/users.dart'; // ตรวจสอบให้แน่ใจว่า import ถูกต้อง
 import '../models/token.dart';
 
 // ตรวจสอบ BASE_URL ของคุณให้ตรงกับ Backend
-const String API_BASE_URL = 'http://192.168.1.154:5000/api/v1';
+const String API_BASE_URL = 'http://192.168.0.195:8000/api/v1';
 
 class AuthService {
+  // ... (โค้ด login, register, getAccessToken, getCurrentUserFromLocal, logout เดิม) ...
+
   static Future<Token?> login(String username, String password) async {
+    // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
     final url = Uri.parse('$API_BASE_URL/auth/auth/token');
     try {
       final response = await http.post(
@@ -37,6 +40,7 @@ class AuthService {
   }
 
   static Future<User> register(Map<String, dynamic> userData) async {
+    // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
     final url = Uri.parse('$API_BASE_URL/auth/auth/register');
     try {
       final response = await http.post(
@@ -74,5 +78,78 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('accessToken');
     await prefs.remove('currentUser');
+  }
+
+  // --- เพิ่มฟังก์ชันใหม่สำหรับ OTP และ Password Reset ด้านล่างนี้ ---
+
+  static Future<bool> requestOtp(String email) async {
+    // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
+    final url = Uri.parse('$API_BASE_URL/auth/auth/request-otp');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email}),
+      );
+
+      if (response.statusCode == 200) {
+        return true; // OTP request successful
+      } else {
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to request OTP');
+      }
+    } catch (e) {
+      throw Exception('Request OTP failed: $e');
+    }
+  }
+
+  static Future<bool> verifyOtp(String email, String otpCode) async {
+    final url = Uri.parse('$API_BASE_URL/auth/auth/verify-otp');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email, 'otp_code': otpCode}),
+      );
+
+      if (response.statusCode == 200) {
+        // ถ้า Backend คืนแค่ 200 OK โดยไม่มี User object กลับมา
+        return true; // คืนค่าเป็น true เมื่อสำเร็จ
+      } else {
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to verify OTP');
+      }
+    } catch (e) {
+      throw Exception('OTP verification failed: $e');
+    }
+  }
+
+  static Future<bool> resetPassword(
+    String email,
+    String otpCode,
+    String newPassword,
+  ) async {
+    // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
+    final url = Uri.parse('$API_BASE_URL/auth/auth/reset-password');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email': email,
+          'otp_code': otpCode,
+          'new_password': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true; // Password reset successful
+      } else {
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to reset password');
+      }
+    } catch (e) {
+      throw Exception('Password reset failed: $e');
+    }
   }
 }
