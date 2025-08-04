@@ -29,3 +29,11 @@ fastapi dev app/main.py ก็คือคำถึง app ก่อนเเล
               server   Server started at http://127.0.0.1:8000
               server   Documentation at http://127.0.0.1:8000/docs
 /*
+
+/*
+หลังจาก รันเข้า .venv เเล้ว ทำการเชื่อม FastApi ขึ้นเเล้ว
+หลังจากนั้นก็ Run ตัว Flutter ได้เลย
+ถ้าไม่ขึ้นมีวิธีสำรองคือเปลี่ยน port เป็น 10.0.2.2:8000 ทั้ง 2 ไฟล์ ได้เเก่
+1.auth_service.dart --> const String API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
+2.main.py --> "http://10.0.2.2:8000", # IP Address ของเครื่องที่รัน Backend
+*/
