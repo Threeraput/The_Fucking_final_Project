@@ -37,3 +37,13 @@ fastapi dev app/main.py ก็คือคำถึง app ก่อนเเล
 1.auth_service.dart --> const String API_BASE_URL = 'http://10.0.2.2:8000/api/v1';
 2.main.py --> "http://10.0.2.2:8000", # IP Address ของเครื่องที่รัน Backend
 */
+
+*/
+หลังจากเชื่อม .venv เชื่อม FastApi เเล้ว ต่อมา
+จะทำเรื่อง OTP เพิ่ม 
+1.ติดตั้ง pip install fastapi-mail ใน (.venv) C:\face\face_attendance_app\backend> ให้เรียบร้อย
+2.ก็ไปทำการสมัคร app passwords google --> https://support.google.com/accounts/answer/185833?hl=en เพื่อเอามาใช้เป็นเมลส่ง OTP 
+2.1 https://temp-mail.org/ เอาไว้ใช้เป็น เมล สำหรับลอง test ส่ง OTP 
+3.ติดตั้ง pip install alembic จะมีไฟล์ที่เกี่ยวกับ alembic.ini
+
+/*
