@@ -7,7 +7,6 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
-
 from app.models.user import User
 from app.models.role import Role
 from app.models.permission import Permission
@@ -34,6 +33,23 @@ def generate_student_id() -> str:
 def generate_teacher_id() -> str:
     """Generates a unique teacher ID (e.g., TEA-UUID_PART)."""
     return f"TEA-{uuid.uuid4().hex[:8].upper()}"
+
+def create_user(db: Session, user_data: dict) -> User:
+    #  เอา role ออกจาก dict ก่อน เพื่อไม่ให้ error ตอนสร้าง User
+    role = user_data.pop("role", None)
+
+    new_user = User(**user_data)
+
+    #  ใช้ role ที่ดึงออกมา generate id
+    if role == "student" and not new_user.student_id:
+        new_user.student_id = generate_student_id()
+    elif role == "teacher" and not new_user.teacher_id:
+        new_user.teacher_id = generate_teacher_id()
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
 
 # --- CRUD Operations and Business Logic ---
 def assign_role_to_user(db: Session, user: User, role_name: str):

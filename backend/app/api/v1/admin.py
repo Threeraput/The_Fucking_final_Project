@@ -1,5 +1,6 @@
 # backend/app/api/v1/admin.py
 from fastapi import APIRouter, Depends, HTTPException, status, Path
+from typing import List
 from sqlalchemy.orm import Session
 import uuid
 
@@ -35,3 +36,21 @@ async def approve_user_as_teacher(
     # Ensure roles are loaded before responding
     _ = approved_user.roles
     return approved_user
+
+@router.get("/pending-teachers", response_model=List[UserResponse])
+async def get_pending_teachers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    ดึงรายชื่อ Teacher ที่ยังไม่ได้รับการอนุมัติ (สำหรับ Admin).
+    """
+    pending_teachers = db.query(User).filter(
+        User.is_approved == False
+    ).all()
+    
+    # ดึง roles สำหรับแต่ละ user ก่อน return
+    for user in pending_teachers:
+        _ = user.roles
+    
+    return pending_teachers

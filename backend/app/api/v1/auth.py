@@ -22,7 +22,7 @@ from app.schemas.otp_schema import (
 from app.models.user import User
 from app.models.role import Role # <-- เพิ่มการ import Role Model
 from app.models.association import user_roles # <-- แก้ไขการ import ให้ใช้ user_roles (Table object)
-from app.services.db_service import get_user_by_email, get_user_by_username
+from app.services.db_service import get_user_by_email, get_user_by_username ,  create_user , assign_role_to_user
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 # นำเข้า Service ใหม่สำหรับ OTP และ Email
@@ -35,9 +35,6 @@ logger = logging.getLogger(__name__)
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
-    """
-    ลงทะเบียนผู้ใช้ใหม่ในระบบ และส่ง OTP เพื่อยืนยันอีเมล
-    """
     db_user_by_username = get_user_by_username(db, username=user_create.username)
     if db_user_by_username:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
@@ -48,45 +45,37 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
     hashed_password = get_password_hash(user_create.password)
-    
-    # --- ปรับปรุง: เพิ่ม Logic การกำหนด is_approved ตาม role ---
+
+    # --- Logic is_approved ตาม role ---
     is_approved_status = True
     if user_create.role == "teacher":
         is_approved_status = False
-    # ----------------------------------------------------
+    # -----------------------------------
 
-    new_user = User(
-        username=user_create.username,
-        password_hash=hashed_password,
-        first_name=user_create.first_name,
-        last_name=user_create.last_name,
-        email=user_create.email,
-        student_id=user_create.student_id,
-        teacher_id=user_create.teacher_id,
-        is_active=False, # ผู้ใช้ใหม่จะไม่ Active จนกว่าจะยืนยัน OTP
-        is_approved=is_approved_status # สถานะการอนุมัติ
-    )
+    # ✅ user_data สำหรับ User ไม่ใส่ role
+    user_data = {
+        "username": user_create.username,
+        "password_hash": hashed_password,
+        "first_name": user_create.first_name,
+        "last_name": user_create.last_name,
+        "email": user_create.email,
+        "student_id": user_create.student_id,
+        "teacher_id": user_create.teacher_id,
+        "is_active": False,
+        "is_approved": is_approved_status,
+        "role": user_create.role
+    }
 
     try:
-        db.add(new_user)
-        # flush เพื่อให้ SQLAlchemy สร้าง user_id ก่อน commit
-        db.flush()
+        # ✅ สร้าง user (generate student_id/teacher_id จะทำงานใน create_user)
+        new_user = create_user(db, user_data)
 
-        # Assign Role (ต้องมี Role นั้นใน DB ก่อน)
-        role_to_assign = db.query(Role).filter(Role.name == user_create.role).first()
-        if not role_to_assign:
-            db.rollback()
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Role '{user_create.role}' not found.")
-        
-        # --- ปรับปรุง: เพิ่ม Logic การกำหนด role ให้กับผู้ใช้ใหม่ ---
-        # ต้องใช้ Table object ในการ insert ข้อมูลลงตารางเชื่อมความสัมพันธ์
-        db.execute(user_roles.insert().values(user_id=new_user.user_id, role_id=role_to_assign.id))
-        # ----------------------------------------------------
-
+        # ✅ assign role แยกออกมา
+        assign_role_to_user(db, new_user, user_create.role)
         db.commit()
         db.refresh(new_user)
 
-        # สร้าง OTP และส่งอีเมล
+        # ✅ สร้าง OTP + ส่งอีเมล
         otp_record = create_otp(db, new_user.user_id)
         otp_sent = await send_email(
             recipients=[new_user.email],
@@ -95,13 +84,12 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
         )
         if not otp_sent:
             db.rollback()
-            logger.error(f"Failed to send OTP email for new user: {new_user.email}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to send OTP email. Please try again or contact support."
             )
-        
-        user_response_data = UserResponse(
+
+        return UserResponse(
             user_id=new_user.user_id,
             username=new_user.username,
             first_name=new_user.first_name,
@@ -114,12 +102,12 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
             last_login_at=new_user.last_login_at,
             roles=[user_create.role]
         )
-        return user_response_data
 
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to register user due to unexpected error: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred during registration. Please try again.")
+
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
