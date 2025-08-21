@@ -16,6 +16,7 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
     student_id: Optional[str] = Field(None, max_length=20)
     teacher_id: Optional[str] = Field(None, max_length=20)
+    role: str = Field(..., pattern="^(student|teacher|admin)$")
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -33,6 +34,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     user_id: uuid.UUID
     is_active: bool
+    is_approved: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
     last_login_at: Optional[datetime] = None

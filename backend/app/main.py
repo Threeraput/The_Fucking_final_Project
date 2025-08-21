@@ -1,11 +1,10 @@
 # backend/app/main.py
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager # สำหรับ lifespan events
 from app.database import engine, Base, get_db
-from app.api.v1 import auth, users # Import เฉพาะ routers ที่สร้างแล้ว
+from app.api.v1 import auth, users , admin # Import เฉพาะ routers ที่สร้างแล้ว
 # from app.api.v1 import classes, attendance, admin # ถ้ายังไม่มีไฟล์เหล่านี้ ให้ comment ไว้ก่อน
 from app.services.db_service import initialize_roles_permissions
 
@@ -33,9 +32,9 @@ origins = [
     "http://127.0.0.1",
     "http://127.0.0.1:5000", # ถ้า Flutter Web รันที่พอร์ตเดียวกันกับ Backend
     "http://127.0.0.1:5500", # พอร์ตที่ VS Code Live Server หรือ Flutter Web อาจใช้
-    "http://192.168.1.154:5000", # IP Address ของเครื่องที่รัน Backend
-    "file://", # สำหรับการเปิดไฟล์ HTML โดยตรง (ถ้ายังใช้ HTML/JS)
-    "null", # สำหรับบางเบราว์เซอร์เมื่อเปิดไฟล์ HTML ตรงๆ
+    "http://192.168.0.195:5000", # IP Address ของเครื่องที่รัน Backend
+    "file://", 
+    "null", 
     # เพิ่ม IP Address ของเครื่องที่คุณรัน Flutter App หากทดสอบบนมือถือจริงในเครือข่ายเดียวกัน
 ]
 
@@ -53,7 +52,7 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 # ถ้าคุณยังไม่ได้สร้าง routers อื่นๆ ให้ comment บรรทัดเหล่านี้ไว้ก่อน เพื่อป้องกัน ImportError
 # app.include_router(classes.router, prefix="/api/v1/classes", tags=["Classes"])
 # app.include_router(attendance.router, prefix="/api/v1/attendance", tags=["Attendance"])
-# app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 
 # --- Optional: Default root endpoint ---

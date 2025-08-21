@@ -18,7 +18,8 @@ class User(Base):
     email = Column(String(120), unique=True, index=True, nullable=False)
     student_id = Column(String(20), unique=True, index=True, nullable=True)
     teacher_id = Column(String(20), unique=True, index=True, nullable=True)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True , nullable=False) # ใช้ default=True เพื่อให้เป็น True โดยค่าเริ่มต้น
+    is_approved = Column(Boolean, default=True , nullable=False) # ใช้ default=True เพื่อให้เป็น True โดยค่าเริ่มต้น
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login_at = Column(DateTime, nullable=True)
@@ -43,6 +44,8 @@ class User(Base):
     
     # User -> OTPs (One-to-Many)
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
+    
+    enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
 
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"
