@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Path
 from typing import List
 from sqlalchemy.orm import Session
 import uuid
-
 from app.database import get_db
 from app.schemas.user_schema import UserResponse # ใช้สำหรับ Response
 from app.models.user import User # ใช้ User Model
@@ -18,6 +17,8 @@ async def get_admin_status(current_user: User = Depends(get_current_admin_user))
     A simple test endpoint for admin status. Requires Admin role.
     """
     return {"message": f"Admin endpoint is working! Welcome, {current_user.username}."}
+
+# endpoint for approving a teacher
 
 @router.post("/users/{user_id}/approve-teacher", response_model=UserResponse)
 async def approve_user_as_teacher(
@@ -49,8 +50,25 @@ async def get_pending_teachers(
         User.is_approved == False
     ).all()
     
-    # ดึง roles สำหรับแต่ละ user ก่อน return
+    # --- แก้ไขตรงนี้: สร้าง List ของ UserResponse ที่มี roles เป็น String ---
+    response_list = []
     for user in pending_teachers:
-        _ = user.roles
+        # ดึง roles สำหรับแต่ละ user ก่อน return
+        user_roles = [role.name for role in user.roles]
+        
+        user_response = UserResponse(
+            user_id=user.user_id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            email=user.email,
+            is_active=user.is_active,
+            is_approved=user.is_approved,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login_at=user.last_login_at,
+            roles=user_roles # <-- ส่ง roles ที่เป็น string
+        )
+        response_list.append(user_response)
     
-    return pending_teachers
+    return response_list

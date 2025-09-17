@@ -31,16 +31,15 @@ class User(Base):
     # User -> Face Samples (One-to-Many)
     face_samples = relationship("UserFaceSample", back_populates="user", cascade="all, delete-orphan")
 
-    # User -> Attendances (One-to-Many, นักเรียนเป็นเจ้าของ Attendance)
+    # User -> Attendances (One-to-Many, นักเรียนเป็นคนถูกบันทึก)
     attendances = relationship("Attendance", foreign_keys='Attendance.student_id', back_populates="student_rel")
 
     # User -> Recorded Attendances (One-to-Many, อาจารย์/ผู้ดูแลเป็นคนบันทึก)
     recorded_attendances = relationship("Attendance", foreign_keys='Attendance.recorded_by_user_id', back_populates="recorder_rel")
-
-    # --- เพิ่ม 2 บรรทัดนี้เข้ามาใน User Model ---
+    # User -> Classes (One-to-Many, อาจารย์เป็นเจ้าของ Class)
     teaching_classes = relationship("Class", back_populates="teacher", foreign_keys='Class.teacher_id')
     enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
-    # ----------------------------------------------
+   
     
     # User -> OTPs (One-to-Many)
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")

@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from app.models.user import User
 from app.models.role import Role
 from app.models.permission import Permission
-from app.models.association import user_roles, role_permissions # <-- นำเข้า Table Objects
+from app.models.association import user_roles, role_permissions 
 
 # --- CRUD Read Operations for User ---
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
@@ -73,15 +73,15 @@ def approve_teacher(db: Session, user_id: uuid.UUID) -> Optional[User]:
     if not user:
         return None
     
-    # Check if user has the 'teacher' role by querying Table Object
-    stmt = select(user_roles).join(Role).where(
-        and_(user_roles.c.user_id == user.user_id, Role.name == "teacher")
-    )
-    if not db.execute(stmt).first():
+    # เช็คว่า user มี role 'teacher' จริง ๆ ไหม
+    if not any(role.name == "teacher" for role in user.roles):
         raise ValueError("User is not a teacher.")
 
     user.is_approved = True
+    db.commit()           # บันทึกค่าใน DB
+    db.refresh(user)      # sync object ให้เป็นค่าล่าสุด
     return user
+
 
 # --- Initial Database Setup Logic (for startup event) ---
 def initialize_roles_permissions(db: Session):

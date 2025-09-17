@@ -8,6 +8,7 @@ from app.api.v1 import auth, users , admin # Import เฉพาะ routers ท�
 # from app.api.v1 import classes, attendance, admin # ถ้ายังไม่มีไฟล์เหล่านี้ ให้ comment ไว้ก่อน
 from app.services.db_service import initialize_roles_permissions
 
+
 # ใช้ asynccontextmanager สำหรับ startup/shutdown events (ดีกว่า @app.on_event)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +33,7 @@ origins = [
     "http://127.0.0.1",
     "http://127.0.0.1:5000", # ถ้า Flutter Web รันที่พอร์ตเดียวกันกับ Backend
     "http://127.0.0.1:5500", # พอร์ตที่ VS Code Live Server หรือ Flutter Web อาจใช้
-    "http://192.168.0.195:5000", # IP Address ของเครื่องที่รัน Backend
+    "http://192.168.1.141:5000", # IP Address ของเครื่องที่รัน Backend
     "file://", 
     "null", 
     # เพิ่ม IP Address ของเครื่องที่คุณรัน Flutter App หากทดสอบบนมือถือจริงในเครือข่ายเดียวกัน

@@ -152,4 +152,54 @@ class AuthService {
       throw Exception('Password reset failed: $e');
     }
   }
+
+
+  static Future<List<User>> getPendingTeachers() async {
+    final url = Uri.parse('$API_BASE_URL/admin/admin/pending-teachers');
+    final accessToken = await getAccessToken();
+    if (accessToken == null) {
+      throw Exception('Not authenticated');
+    }
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(response.body);
+        return jsonList.map((json) => User.fromJson(json)).toList();
+      } else {
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to fetch pending teachers');
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch pending teachers: $e');
+    }
+  }
+
+  static Future<void> approveTeacher(String userId) async {
+    final url = Uri.parse('$API_BASE_URL/admin/admin/users/$userId/approve-teacher');
+    final accessToken = await getAccessToken();
+    if (accessToken == null) {
+      throw Exception('Not authenticated');
+    }
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+      if (response.statusCode != 200) {
+        final error = json.decode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to approve teacher');
+      }
+    } catch (e) {
+      throw Exception('Failed to approve teacher: $e');
+    }
+  }
 }

@@ -1,12 +1,14 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/admin_dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/otp_verification_screen.dart'; 
 import 'screens/forgot_password_screen.dart'; 
 import 'screens/reset_password_screen.dart'; 
-import 'services/auth_service.dart'; 
+import 'services/auth_service.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +35,7 @@ class MyApp extends StatelessWidget {
         '/verify-otp': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as String?;
           if (args == null) {
-            // กรณีไม่มี email ส่งมา ให้กลับไปหน้า login หรือแสดง error
+          // กรณีไม่มี email ส่งมา ให้กลับไปหน้า login หรือแสดง error
             return LoginScreen(); // หรือ ErrorScreen()
           }
           // *** แก้ไขตรงนี้: เปลี่ยน identifier เป็น email ***
@@ -48,6 +50,7 @@ class MyApp extends StatelessWidget {
           }
           return ResetPasswordScreen(email: args);
         },
+        '/admin-dashboard': (context) => AdminDashboardScreen(),
       },
     );
   }

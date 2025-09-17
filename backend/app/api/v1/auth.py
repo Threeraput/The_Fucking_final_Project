@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 import uuid
 from typing import Optional
-
 from app.core.config import settings
 from app.database import get_db
 from app.schemas.user_schema import (
@@ -24,7 +23,6 @@ from app.models.role import Role # <-- เพิ่มการ import Role Mode
 from app.models.association import user_roles # <-- แก้ไขการ import ให้ใช้ user_roles (Table object)
 from app.services.db_service import get_user_by_email, get_user_by_username ,  create_user , assign_role_to_user
 from app.core.security import get_password_hash, verify_password, create_access_token
-
 # นำเข้า Service ใหม่สำหรับ OTP และ Email
 from app.services.otp_service import create_otp, verify_otp, get_user_by_email_or_username_for_otp
 from app.services.email_service import send_email
@@ -50,9 +48,8 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
     is_approved_status = True
     if user_create.role == "teacher":
         is_approved_status = False
-    # -----------------------------------
 
-    # ✅ user_data สำหรับ User ไม่ใส่ role
+    #  user_data สำหรับ User ไม่ใส่ role
     user_data = {
         "username": user_create.username,
         "password_hash": hashed_password,
@@ -67,15 +64,15 @@ async def register_user(user_create: UserCreate, db: Session = Depends(get_db)):
     }
 
     try:
-        # ✅ สร้าง user (generate student_id/teacher_id จะทำงานใน create_user)
+        # สร้าง user (generate student_id/teacher_id จะทำงานใน create_user)
         new_user = create_user(db, user_data)
 
-        # ✅ assign role แยกออกมา
+        # assign role แยกออกมา
         assign_role_to_user(db, new_user, user_create.role)
         db.commit()
         db.refresh(new_user)
 
-        # ✅ สร้าง OTP + ส่งอีเมล
+        # สร้าง OTP + ส่งอีเมล
         otp_record = create_otp(db, new_user.user_id)
         otp_sent = await send_email(
             recipients=[new_user.email],
@@ -169,7 +166,7 @@ async def login_for_access_token(
         created_at=user.created_at,
         updated_at=user.updated_at,
         last_login_at=user.last_login_at,
-        roles=user_roles
+        roles = user_roles
     )
 
     return Token(access_token=access_token, token_type="bearer", user=user_response_data)

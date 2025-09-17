@@ -8,12 +8,9 @@ cffi==1.17.1
 click==8.2.1
 colorama==0.4.6
 cryptography==45.0.5
-dlib @ file:///D:/face_attendance_app/backend/dlib-19.24.99-cp312-cp312-win_amd64.whl#sha256=20c62e606ca4c9961305f7be3d03990380d3e6c17f8d27798996e97a73271862
 dnspython==2.7.0
 ecdsa==0.19.1
 email_validator==2.2.0
-face-recognition==1.3.0
-face_recognition_models==0.3.0
 fastapi==0.116.0
 greenlet==3.2.3
 h11==0.16.0
