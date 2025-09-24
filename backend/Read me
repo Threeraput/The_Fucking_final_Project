@@ -45,5 +45,6 @@ fastapi dev app/main.py ก็คือคำถึง app ก่อนเเล
 2.ก็ไปทำการสมัคร app passwords google --> https://support.google.com/accounts/answer/185833?hl=en เพื่อเอามาใช้เป็นเมลส่ง OTP 
 2.1 https://temp-mail.org/ เอาไว้ใช้เป็น เมล สำหรับลอง test ส่ง OTP 
 3.ติดตั้ง pip install alembic จะมีไฟล์ที่เกี่ยวกับ alembic.ini
-
 /*
+
+คำสั่ง เปิด server uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
