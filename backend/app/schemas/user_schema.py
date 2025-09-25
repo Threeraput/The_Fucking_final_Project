@@ -40,8 +40,8 @@ class UserResponse(UserBase):
     last_login_at: Optional[datetime] = None
     roles: List[str] = [] # To include role names in response
 
-    class Config:
-        from_attributes = True # สำหรับ Pydantic v2
+class Config:
+    from_attributes = True # สำหรับ Pydantic v2
 
 # --- Schemas สำหรับ Token / Authentication ---
 

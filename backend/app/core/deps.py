@@ -12,7 +12,7 @@ from app.models.role import Role
 from app.models.association import user_roles # Import association table
 from app.schemas.user_schema import TokenData # Pydantic schema สำหรับ token payload
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/auth/token")
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     """

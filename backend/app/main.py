@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager # สำหรับ lifespan events
 from app.database import engine, Base, get_db
-from app.api.v1 import auth, users , admin # Import เฉพาะ routers ที่สร้างแล้ว
+from app.api.v1 import auth, users , admin , face_recognition # Import เฉพาะ routers ที่สร้างแล้ว
 # from app.api.v1 import classes, attendance, admin # ถ้ายังไม่มีไฟล์เหล่านี้ ให้ comment ไว้ก่อน
 from app.services.db_service import initialize_roles_permissions
-
+from fastapi.staticfiles import StaticFiles
 
 # ใช้ asynccontextmanager สำหรับ startup/shutdown events (ดีกว่า @app.on_event)
 @asynccontextmanager
@@ -50,11 +50,12 @@ app.add_middleware(
 # รวม API Routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(face_recognition.router, prefix="/api/v1/face-recognition", tags=["Face Recognition"])
 # ถ้าคุณยังไม่ได้สร้าง routers อื่นๆ ให้ comment บรรทัดเหล่านี้ไว้ก่อน เพื่อป้องกัน ImportError
 # app.include_router(classes.router, prefix="/api/v1/classes", tags=["Classes"])
 # app.include_router(attendance.router, prefix="/api/v1/attendance", tags=["Attendance"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
-
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # --- Optional: Default root endpoint ---
 @app.get("/")

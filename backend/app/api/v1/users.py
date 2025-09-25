@@ -14,7 +14,7 @@ from app.services.db_service import get_user_by_id
 from app.core.security import decode_access_token
 
 # กำหนด scheme สำหรับ OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/auth/token")
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     # ... (โค้ดสำหรับ get_current_user คงเดิม) ...

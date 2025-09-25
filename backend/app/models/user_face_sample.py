@@ -13,7 +13,7 @@ class UserFaceSample(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False)
     image_url = Column(String(255), nullable=True) # ถ้าเก็บเป็น URL
     # หรือถ้าเก็บ binary data ใน DB โดยตรง (ไม่แนะนำสำหรับไฟล์ขนาดใหญ่)
-    # face_embedding = Column(LargeBinary, nullable=True) # For storing face recognition embeddings
+    face_embedding = Column(LargeBinary, nullable=True) # For storing face recognition embeddings
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
