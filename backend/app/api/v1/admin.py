@@ -32,11 +32,27 @@ async def approve_user_as_teacher(
     """
     approved_user = approve_teacher(db, user_id)
     if not approved_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_CODE, detail="User not found or is not a teacher.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User not found or is not a teacher."
+        )
 
-    # Ensure roles are loaded before responding
-    _ = approved_user.roles
-    return approved_user
+    # แปลง Role objects → List[str]
+    user_roles = [role.name for role in approved_user.roles]
+
+    return UserResponse(
+        user_id=approved_user.user_id,
+        username=approved_user.username,
+        first_name=approved_user.first_name,
+        last_name=approved_user.last_name,
+        email=approved_user.email,
+        is_active=approved_user.is_active,
+        is_approved=approved_user.is_approved,
+        created_at=approved_user.created_at,
+        updated_at=approved_user.updated_at,
+        last_login_at=approved_user.last_login_at,
+        roles=user_roles
+    )
 
 @router.get("/pending-teachers", response_model=List[UserResponse])
 async def get_pending_teachers(

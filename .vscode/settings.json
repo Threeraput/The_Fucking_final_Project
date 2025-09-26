@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "D:/face_attendance_app/frontend/linux"
+    "cmake.sourceDirectory": "D:/face_attendance_app/frontend/linux",
+    "python-envs.pythonProjects": []
 }

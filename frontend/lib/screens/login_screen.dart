@@ -1,6 +1,7 @@
 // lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -46,45 +47,150 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Login')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _usernameController,
-              decoration: InputDecoration(labelText: 'Username or Email'),
-            ),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
-            SizedBox(height: 20),
-            _isLoading
-                ? CircularProgressIndicator()
-                : ElevatedButton(onPressed: _login, child: Text('Login')),
-            if (_message != null)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(_message!, style: TextStyle(color: Colors.red)),
+      body: SafeArea(
+        top: false, // ปิดเว้นขอบบน เพื่อให้รูปติดขอบบนได้
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ✅ รูปภาพชิดขอบบนเต็มหน้าจอ
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+                child: Image.asset(
+                  'assets/images/Image1.png',
+                  width: double.infinity,
+                  height: 320,
+                  fit: BoxFit.cover,
+                ),
               ),
-            // --- เพิ่มส่วนนี้สำหรับปุ่ม "Forgot Password?" ---
-            TextButton(
-              onPressed: () {
-                // เมื่อกดปุ่ม จะนำทางไปยังหน้า '/forgot-password'
-                Navigator.of(context).pushNamed('/forgot-password');
-              },
-              child: Text('Forgot Password?'),
-            ),
-            // --------------------------------------------------
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pushNamed('/register');
-              },
-              child: Text('Don\'t have an account? Register here'),
-            ),
-          ],
+
+              const SizedBox(height: 24),
+
+              // ✅ ส่วนฟอร์ม ค่อยใส่ Padding แยก
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _usernameController,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        labelText: 'Your Email',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        labelText: 'Password',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      obscureText: true,
+                    ),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamed('/forgot-password');
+                        },
+                        style: ButtonStyle(
+                          foregroundColor: WidgetStateProperty.all(
+                            Colors.black,
+                          ),
+                          textStyle: WidgetStateProperty.all(
+                            const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          overlayColor: WidgetStateProperty.all(
+                            Colors.transparent,
+                          ),
+                        ),
+                        child: const Text('Forgot password?'),
+                      ),
+                    ),
+
+                    _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color.fromARGB(255, 28, 178, 248),
+                              strokeWidth: 5,
+                            ),
+                          )
+                        : ElevatedButton(
+                            onPressed: _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(
+                                185,
+                                64,
+                                195,
+                                255,
+                              ),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              minimumSize: const Size(double.infinity, 48),
+                            ),
+                            child: const Text(
+                              'Login',
+                              style: TextStyle(fontSize: 18),
+                            ),
+                          ),
+
+                    if (_message != null)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          _message!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+
+                    Align(
+                      alignment: Alignment.center,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushNamed('/register');
+                        },
+                        style: ButtonStyle(
+                          foregroundColor: WidgetStateProperty.all(
+                            Colors.black,
+                          ),
+                          textStyle: WidgetStateProperty.all(
+                            const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          overlayColor: WidgetStateProperty.all(
+                            Colors.transparent,
+                          ),
+                        ),
+                        child: const Text(
+                          "Don't have an account? Register here",
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

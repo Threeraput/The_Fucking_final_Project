@@ -4,11 +4,10 @@ import 'package:frontend/screens/admin_dashboard_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/otp_verification_screen.dart'; 
-import 'screens/forgot_password_screen.dart'; 
-import 'screens/reset_password_screen.dart'; 
+import 'screens/otp_verification_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/reset_password_screen.dart';
 import 'services/auth_service.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +24,21 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Face Attendance App',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        inputDecorationTheme: InputDecorationTheme(
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: Color.fromARGB(212, 134, 134, 134), // สีกรอบเวลาพิมพ์
+              width: 2,
+            ),
+          ),
+          floatingLabelStyle: const TextStyle(
+            color: Color.fromARGB(255, 134, 134, 134), // สี label ตอนโฟกัส
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       initialRoute: initialRoute,
       routes: {
         '/login': (context) => LoginScreen(),
@@ -35,7 +48,7 @@ class MyApp extends StatelessWidget {
         '/verify-otp': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as String?;
           if (args == null) {
-          // กรณีไม่มี email ส่งมา ให้กลับไปหน้า login หรือแสดง error
+            // กรณีไม่มี email ส่งมา ให้กลับไปหน้า login หรือแสดง error
             return LoginScreen(); // หรือ ErrorScreen()
           }
           // *** แก้ไขตรงนี้: เปลี่ยน identifier เป็น email ***
