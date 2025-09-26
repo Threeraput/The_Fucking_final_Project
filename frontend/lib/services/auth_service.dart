@@ -5,7 +5,7 @@ import '../models/users.dart'; // ตรวจสอบให้แน่ใจ�
 import '../models/token.dart';
 
 // ตรวจสอบ BASE_URL ของคุณให้ตรงกับ Backend
-const String API_BASE_URL = 'http://192.168.0.195:8000/api/v1';
+const String API_BASE_URL = 'http://192.168.122.125:8000/api/v1';
 
 class AuthService {
   // ... (โค้ด login, register, getAccessToken, getCurrentUserFromLocal, logout เดิม) ...
