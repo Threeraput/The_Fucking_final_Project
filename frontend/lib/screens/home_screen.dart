@@ -15,9 +15,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ตัวอย่างข้อมูลคอร์ส/ห้องเรียน
   List<Map<String, String>> _courses = [
-    {'title': 'Math 101', 'icon': 'M', 'desc': 'Basic Math', 'location': 'Room 101'},
-    {'title': 'Computer Science', 'icon': 'C', 'desc': 'Intro to CS', 'location': 'Lab 1'},
-    {'title': 'English Literature', 'icon': 'E', 'desc': 'Poems & Stories', 'location': 'Room 202'},
+    {
+      'title': 'Math 101',
+      'icon': 'M',
+      'desc': 'Basic Math',
+      'location': 'Room 101',
+    },
+    {
+      'title': 'Computer Science',
+      'icon': 'C',
+      'desc': 'Intro to CS',
+      'location': 'Lab 1',
+    },
+    {
+      'title': 'English Literature',
+      'icon': 'E',
+      'desc': 'Poems & Stories',
+      'location': 'Room 202',
+    },
   ];
 
   @override
@@ -123,7 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
           if (_isAdmin)
             TextButton(
               onPressed: () {
@@ -131,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: Text('Admin', style: TextStyle(color: Colors.cyanAccent)),
             ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
 
@@ -159,13 +174,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         backgroundColor: Colors.blueAccent,
                         child: Text(
                           course['icon'] ?? '',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       title: Text(course['title'] ?? ''),
                       subtitle: Text(course['desc'] ?? ''),
                       onTap: () {
-                        Navigator.pushNamed(context, '/course-detail', arguments: course);
+                        Navigator.pushNamed(
+                          context,
+                          '/course-detail',
+                          arguments: course,
+                        );
                       },
                     );
                   },
@@ -180,68 +202,81 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: Column(
-
-              children: [
-                // User Info แบบกล่อง
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        spreadRadius: 2,
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Hello, ${_currentUser!.firstName ?? _currentUser!.username} 👋',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Roles: ${_currentUser!.roles.join(', ')}'),
-                    ],
-                  ),
-                ),
-
-                // Courses List ด้านล่าง
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _courses.length,
-                    itemBuilder: (context, index) {
-                      final course = _courses[index];
-                      return Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                children: [
+                  // User Info แบบกล่อง
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
-                        elevation: 3,
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          title: Text(
-                            course['title'] ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hello, ${_currentUser!.firstName ?? _currentUser!.username} 👋',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
                           ),
-                          subtitle: Text('${course['desc'] ?? ''}\nLocation: ${course['location'] ?? ''}'),
-                          isThreeLine: true,
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                          onTap: () {
-                            Navigator.pushNamed(context, '/course-detail', arguments: course);
-                          },
                         ),
-                      );
-                    },
+                        const SizedBox(height: 4),
+                        Text('Roles: ${_currentUser!.roles.join(', ')}'),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  // Courses List ด้านล่าง
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _courses.length,
+                      itemBuilder: (context, index) {
+                        final course = _courses[index];
+                        return Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 3,
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          child: ListTile(
+                            title: Text(
+                              course['title'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${course['desc'] ?? ''}\nLocation: ${course['location'] ?? ''}',
+                            ),
+                            isThreeLine: true,
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 18,
+                            ),
+                            onTap: () {
+                              Navigator.pushNamed(
+                                context,
+                                '/course-detail',
+                                arguments: course,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
 

@@ -25,6 +25,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Face Attendance App',
       theme: ThemeData(
+        textSelectionTheme: TextSelectionThemeData(
+            selectionHandleColor: Colors.blue, // สีจุดจับ
+            selectionColor: Colors.blue.shade200, // สีพื้นหลังตอนเลือกข้อความ
+            cursorColor: Color.fromARGB(209, 35, 35, 35), // สีเคอร์เซอร์
+          ),
         inputDecorationTheme: InputDecorationTheme(
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -32,6 +37,7 @@ class MyApp extends StatelessWidget {
               color: Color.fromARGB(212, 134, 134, 134), // สีกรอบเวลาพิมพ์
               width: 2,
             ),
+            
           ),
           floatingLabelStyle: const TextStyle(
             color: Color.fromARGB(255, 134, 134, 134), // สี label ตอนโฟกัส

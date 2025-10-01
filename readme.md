@@ -85,3 +85,13 @@ OTP_EXPIRE_MINUTES=5              # OTP หมดอายุ 5 นาที
 4.3 ติดตั้ง pip install alembic จะมีไฟล์ที่เกี่ยวกับ alembic.ini
 4.4 ใช้คำสั่งนี้ไหนการ รัน uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 */
+
+/*
+ติดตั้ง Alembic 
+1. pip install alembic
+2. lembic --version
+3. เข้าไปเเก้ไขไฟล์ alembic.ini
+4. alembic revision --autogenerate -m "initial migration"
+5. alembic upgrade head
+*/
+
