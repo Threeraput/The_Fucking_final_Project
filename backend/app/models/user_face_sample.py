@@ -1,6 +1,6 @@
 # backend/app/models/user_face_sample.py
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey, LargeBinary
+from sqlalchemy import Column, String, DateTime, ForeignKey, LargeBinary  , UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -21,3 +21,8 @@ class UserFaceSample(Base):
 
     def __repr__(self):
         return f"<UserFaceSample(user_id='{self.user_id}', sample_id='{self.sample_id}')>"
+    
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_user_face_sample_user"),
+    )
