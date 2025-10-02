@@ -11,7 +11,8 @@ class Class(Base):
     __tablename__ = "classes"
 
     class_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(100), unique=True, index=True, nullable=False)
+    name = Column(String(100), unique=False, index=True, nullable=False)
+    code = Column(String(10), unique=True, nullable=False)
     description = Column(String(255), nullable=True)
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False) # อาจารย์ผู้สอน (User ID)
     start_time = Column(DateTime, nullable=True)
