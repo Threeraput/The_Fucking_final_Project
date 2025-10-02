@@ -44,6 +44,8 @@ class User {
     );
   }
 
+  get profileImageUrl => null;
+
   Map<String, dynamic> toJson() {
     return {
       'user_id': userId,

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/course_detail_page.dart';
+import 'package:frontend/screens/notifications_page.dart';
 import '../services/auth_service.dart';
 import '../models/users.dart';
 
@@ -12,6 +14,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   User? _currentUser;
   bool _isAdmin = false;
+  String currentPage = 'Home';
 
   // ตัวอย่างข้อมูลคอร์ส/ห้องเรียน
   List<Map<String, String>> _courses = [
@@ -54,20 +57,16 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
-  void _showNotifications() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Notifications'),
-        content: const Text('You have 3 new notifications.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+  void _showNotifications(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NotificationsPage()),
     );
+
+    // กลับมาที่ Home แล้ว
+    setState(() {
+      currentPage = 'Home';
+    });
   }
 
   void _addCourseDialog() {
@@ -123,6 +122,67 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildDrawerItem({
+    required String title,
+    required IconData icon,
+    required String pageName,
+    Map<String, String>? courseData,
+  }) {
+    final bool selected = currentPage == pageName;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: selected ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        leading: courseData != null
+            ? CircleAvatar(
+                backgroundColor: Colors.blueAccent,
+                child: Text(
+                  courseData['icon'] ?? '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            : Icon(icon, color: selected ? Colors.blue : null),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: selected ? Colors.blue : null,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        onTap: () {
+  setState(() {
+    currentPage = pageName; // อัปเดต Highlight
+  });
+  Navigator.pop(context); // ปิด Drawer
+
+  if (pageName == 'Home') {
+    // อยู่หน้า Home แล้ว ไม่ต้อง push
+  } else if (pageName == 'Notifications') {
+    _showNotifications(context); // เปิดหน้า Notifications
+  } else if (courseData != null) {
+    // ถ้าเป็นห้องเรียน ส่งข้อมูลไปหน้า CourseDetail
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CourseDetailPage(course: courseData),
+      ),
+    ).then((_) {
+      // กลับมาที่ Home แล้ว
+      setState(() {
+        currentPage = 'Home';
+      });
+    });
+  }
+},      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -145,6 +205,18 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: Text('Admin', style: TextStyle(color: Colors.cyanAccent)),
             ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              if (_currentUser != null) {
+                Navigator.pushNamed(
+                  context,
+                  '/profile',
+                  arguments: _currentUser,
+                );
+              }
+            },
+          ),
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
@@ -157,11 +229,17 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const SizedBox(height: 16),
               // Notification
-              ListTile(
-                leading: const Icon(Icons.notifications),
-                title: const Text('Notifications'),
-                onTap: _showNotifications,
+              _buildDrawerItem(
+                title: 'Home',
+                icon: Icons.home,
+                pageName: 'Home',
               ),
+              _buildDrawerItem(
+                title: 'Notifications',
+                icon: Icons.notifications,
+                pageName: 'Notifications',
+              ),
+              
               const Divider(),
               // ห้องเรียน / Courses List
               Expanded(
@@ -169,26 +247,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemCount: _courses.length,
                   itemBuilder: (context, index) {
                     final course = _courses[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.blueAccent,
-                        child: Text(
-                          course['icon'] ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      title: Text(course['title'] ?? ''),
-                      subtitle: Text(course['desc'] ?? ''),
-                      onTap: () {
-                        Navigator.pushNamed(
-                          context,
-                          '/course-detail',
-                          arguments: course,
-                        );
-                      },
+                    return _buildDrawerItem(
+                      title: course['title'] ?? 'Course $index',
+                      icon: Icons.school,
+                      pageName: course['title'] ?? 'Course $index',
+                      courseData: course,
                     );
                   },
                 ),
@@ -265,12 +328,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               size: 18,
                             ),
                             onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                '/course-detail',
-                                arguments: course,
-                              );
-                            },
+                             Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CourseDetailPage(course: course),
+              ),
+            );
+          },
+                            
                           ),
                         );
                       },
