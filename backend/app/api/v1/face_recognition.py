@@ -19,6 +19,7 @@ from app.schemas.face_schema import FaceSampleResponse
 from app.services.face_recognition_service import get_face_embedding, create_face_sample , compare_faces# ตรวจสอบให้แน่ใจว่า import ถูกต้อง
 from app.core.deps import get_current_user
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/face-recognition", tags=["Face Recognition"])
 
@@ -36,39 +37,87 @@ async def upload_face_for_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not file.content_type.startswith("image/"):
+    # --- ensure upload dir ---
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    # 0) validate ไฟล์
+    if not (file.content_type and file.content_type.startswith("image/")):
         raise HTTPException(status_code=400, detail="Invalid file type. Only images are allowed.")
 
-    file_path = None
-    try:
-        # อ่านไฟล์จาก UploadFile object
-        content = await file.read()
-        
-        # สร้างชื่อไฟล์ที่ไม่ซ้ำกัน
-        file_extension = os.path.splitext(file.filename)[1]
-        filename = f"{current_user.user_id}_{uuid.uuid4().hex}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file.")
 
-        # บันทึกไฟล์ลง disk
-        print(f"Saving file to: {file_path}")
+    # 0.5) ป้องกันซ้ำตั้งแต่ต้น (เร็ว และข้อความชัด)
+    exists = db.query(UserFaceSample).filter(
+        UserFaceSample.user_id == current_user.user_id
+    ).first()
+    if exists:
+        raise HTTPException(
+            status_code=409,
+            detail="Face sample already exists for this user. Please delete it before uploading a new one."
+        )
+
+    # 1) สร้าง embedding จาก bytes ก่อน (กันไฟล์ขยะหากล้มเหลว)
+    try:
+        embedding = get_face_embedding(BytesIO(content))
+    except ValueError as e:
+        msg = str(e).lower()
+        if "no_face" in msg:
+            raise HTTPException(status_code=400, detail="No face detected.")
+        if "multi_face" in msg:
+            raise HTTPException(status_code=400, detail="Please upload an image with exactly one face.")
+        raise HTTPException(status_code=500, detail=f"Face embedding failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Face embedding failed: {e}")
+
+    # 2) เตรียมไฟล์ใหม่
+    file_extension = os.path.splitext(file.filename or "")[1] or ".jpg"
+    filename = f"{current_user.user_id}_{uuid.uuid4().hex}{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    image_url = f"/uploads/{filename}"
+
+    # 3) เขียนไฟล์ + บันทึก DB
+    try:
+        # เขียนไฟล์จริง
         with open(file_path, "wb") as buffer:
             buffer.write(content)
 
-        # ประมวลผลรูปภาพและดึง face embedding
-        embedding = get_face_embedding(file_path)
-
-        # บันทึกข้อมูลลง DB
-        image_url = f"/uploads/{filename}"
+        # สร้าง record ใหม่ (ให้แน่ใจว่า create_face_sample คืน ORM model)
         face_sample = create_face_sample(db, current_user.user_id, image_url, embedding)
+
+        # ถ้า create_face_sample ยังไม่ commit ให้ uncomment บรรทัดล่าง:
+        # db.commit()
+        # db.refresh(face_sample)
 
         return face_sample
 
+    except IntegrityError:
+        # รองรับกรณี unique constraint ชน (race condition)
+        db.rollback()
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=409,
+            detail="Face sample already exists for this user. Please delete it before uploading a new one."
+        )
+
+    except HTTPException:
+        # ส่งต่อ error ที่ raise ด้านบน
+        raise
+
     except Exception as e:
-        print(f"Upload error: {e}")  # เพิ่มบรรทัดนี้
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-    
+        # พลาดอย่างอื่น -> rollback และลบไฟล์ใหม่ทิ้ง
+        db.rollback()
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
 
 @router.post("/verify-face", status_code=status.HTTP_200_OK)
 async def verify_face(

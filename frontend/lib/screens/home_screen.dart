@@ -39,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard'),
+        title: Text('Home Screen'),
         actions: [
           // แสดงปุ่ม "Admin" เฉพาะเมื่อผู้ใช้เป็น Admin
           if (_isAdmin)
@@ -75,6 +75,17 @@ class _HomeScreenState extends State<HomeScreen> {
               Text('Roles: ${_currentUser!.roles.join(', ')}'),
               SizedBox(height: 30),
             ],
+              ElevatedButton.icon(
+              icon: const Icon(Icons.person_add),
+              label: const Text('อัปโหลดใบหน้า'),
+              onPressed: () => Navigator.pushNamed(context, '/upload-face'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.verified_user),
+              label: const Text('ยืนยันตัวตนด้วยใบหน้า'),
+              onPressed: () => Navigator.pushNamed(context, '/verify-face'),
+            ),
           ],
         ),
       ),

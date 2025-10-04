@@ -63,7 +63,7 @@ def create_face_sample(db: Session, user_id: UUID, image_url: str, embedding: by
 
 
 # ฟังก์ชันสำหรับเปรียบเทียบใบหน้า
-def compare_faces(db: Session, user_id: UUID, new_embedding: bytes, tolerance: float = 0.6):
+def compare_faces(db: Session, user_id: UUID, new_embedding: bytes, tolerance: float = 0.45):
     stored_embeddings = db.query(UserFaceSample.face_embedding).filter(
         UserFaceSample.user_id == user_id
     ).all()
@@ -84,6 +84,6 @@ def compare_faces(db: Session, user_id: UUID, new_embedding: bytes, tolerance: f
     # คำนวณ distance และ match
     distances = face_recognition.face_distance(stored_embeddings, new_embedding_np)
     best_distance = float(np.min(distances))
-    is_match = best_distance <= tolerance
-
+    is_match =best_distance <= tolerance
+ 
     return is_match, best_distance
