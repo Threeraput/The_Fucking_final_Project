@@ -24,7 +24,8 @@ class Class(Base):
     teacher = relationship("User", back_populates="teaching_classes", foreign_keys=[teacher_id])
     students = relationship("User", secondary=class_students, back_populates="enrolled_classes")
     attendances = relationship("Attendance", back_populates="class_rel", cascade="all, delete-orphan")
-
+    teacher_location_logs = relationship("TeacherLocation", back_populates="classroom", cascade="all, delete-orphan")
+    student_location_logs = relationship("StudentLocation", back_populates="classroom", cascade="all, delete-orphan")
     def __repr__(self):
         return f"<Class(name='{self.name}')>"
 

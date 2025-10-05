@@ -27,15 +27,26 @@ class User(Base):
     # Relationships
     # User -> Roles (Many-to-Many)
     roles = relationship("Role", secondary=user_roles, back_populates="users")
-
+    location_updates = relationship("TeacherLocation", back_populates="teacher", cascade="all, delete-orphan")
+    student_locations = relationship("StudentLocation", back_populates="student", cascade="all, delete-orphan")
     # User -> Face Samples (One-to-Many)
     face_samples = relationship("UserFaceSample", back_populates="user", cascade="all, delete-orphan")
-
     # User -> Attendances (One-to-Many, นักเรียนเป็นคนถูกบันทึก)
-    attendances = relationship("Attendance", foreign_keys='Attendance.student_id', back_populates="student_rel")
-
+    # Attendance Relationships
+    # ความสัมพันธ์ของนักเรียน (ผู้เข้าเรียน)
+    attendances = relationship(
+        "Attendance", 
+        foreign_keys="[Attendance.student_id]", 
+        back_populates="student", 
+        cascade="all, delete-orphan"
+    )
     # User -> Recorded Attendances (One-to-Many, อาจารย์/ผู้ดูแลเป็นคนบันทึก)
-    recorded_attendances = relationship("Attendance", foreign_keys='Attendance.recorded_by_user_id', back_populates="recorder_rel")
+    recorded_attendances = relationship(
+        "Attendance", 
+        foreign_keys="[Attendance.recorded_by_user_id]", # <-- ชี้ไปที่คอลัมน์ใน Attendance
+        back_populates="recorder", 
+        cascade="all, delete-orphan"
+    )
     # User -> Classes (One-to-Many, อาจารย์เป็นเจ้าของ Class)
     teaching_classes = relationship("Class", back_populates="teacher", foreign_keys='Class.teacher_id')
     enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
