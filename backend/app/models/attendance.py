@@ -1,13 +1,12 @@
 # backend/app/models/attendance.py
 import uuid
-from sqlalchemy import Column, DateTime, ForeignKey, Boolean, Numeric, Enum
+from sqlalchemy import Column, DateTime, ForeignKey, Boolean, Numeric
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from datetime import datetime, timezone
 from app.database import Base
 from app.models.attendance_enums import AttendanceStatus
-
 
 class Attendance(Base):
     __tablename__ = "attendances"
@@ -18,11 +17,17 @@ class Attendance(Base):
 
     check_in_time = Column(DateTime(timezone=True), default=func.now())
 
-    # ใช้ Enum ตามไฟล์ attendance_enums ได้เลย
+    # 🔧 ใช้ค่า .value ของ enum ให้ตรงกับ enum type ใน Postgres
     status = Column(
-        Enum(AttendanceStatus),
-        default=AttendanceStatus.UNVERIFIED_FACE,
-        nullable=False
+        SAEnum(
+            *[e.value for e in AttendanceStatus],   # -> "Present","Late","Absent",...
+            name="attendancestatus",                # ให้ตรงกับชื่อ type ใน DB
+            native_enum=True,
+            create_type=False,                      # ถ้า type มีอยู่แล้วใน DB
+            validate_strings=True,
+        ),
+        default=AttendanceStatus.UNVERIFIED_FACE.value,   # ค่า default เป็น .value
+        nullable=False,
     )
 
     check_in_lat = Column(Numeric(9, 6), nullable=True)
@@ -37,16 +42,8 @@ class Attendance(Base):
 
     # Relationships
     class_rel = relationship("Class", back_populates="attendances")
-    student = relationship(
-        "User",
-        foreign_keys=[student_id],
-        back_populates="attendances"
-    )
-    recorder = relationship(
-        "User",
-        foreign_keys=[recorded_by_user_id],
-        back_populates="recorded_attendances"
-    )
+    student = relationship("User", foreign_keys=[student_id], back_populates="attendances")
+    recorder = relationship("User", foreign_keys=[recorded_by_user_id], back_populates="recorded_attendances")
 
     def __repr__(self):
         return (

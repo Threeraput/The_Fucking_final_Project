@@ -12,6 +12,9 @@ from app.schemas.user_schema import UserResponse # (สมมติว่าค�
 # -----------------
 class ClassroomCreate(BaseModel):
     name: str = Field(..., max_length=100)
+    description: Optional[str] = None 
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
 
 class ClassroomJoin(BaseModel):
     code: str = Field(..., max_length=10, description="The unique code to join the classroom")

@@ -1,22 +1,208 @@
 # backend/app/api/v1/attendance.py
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Path, Body
+from sqlalchemy.orm import Session, joinedload
 
-# Import your database session
 from app.database import get_db
+from app.models.user import User
+from app.models.attendance import Attendance  # <-- Add this import
+from app.schemas.attendance_schema import (
+    AttendanceCheckIn,
+    AttendanceResponse,
+    TeacherLocationUpdate,
+    StudentLocationLogCreate,
+    AttendanceManualOverride,
+)
+# ใช้อันเดียวให้ตรงทั้งโปรเจกต์
+from app.core.deps import get_current_user  # <- ถ้าคุณใช้ของ core.deps อยู่ที่อื่น
+from app.services.attendance_service import record_check_in , handle_reverification , manual_override_attendance
+from app.services.location_service import update_teacher_location_log, log_student_location
 
-# Import any models/schemas you'll need later for attendance management
-# from app.models.attendance import AttendanceRecord # You'll need this for your attendance records
-# from app.schemas.attendance_schema import AttendanceCreate, AttendanceResponse # And these schemas
+router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
-# Initialize the API router for attendance
-attendance_router = APIRouter() # <--- ตรงนี้สำคัญมาก!
 
-# Example: A simple test endpoint for attendance (you can remove this later)
-@attendance_router.get("/", response_model=dict) # Use dict for now, replace with List[AttendanceResponse] later
-async def get_all_attendance_records(db: Session = Depends(get_db)):
+def _has_role(user: User, role_name: str) -> bool:
+    # ปลอดภัยแม้ roles เป็น lazy-loaded
+    try:
+        return any(getattr(r, "name", None) == role_name for r in (user.roles or []))
+    except Exception:
+        return False
+
+
+# ------------------------------------
+# 1. POST /attendance/check-in (Student: Face ID + Proximity Check)
+# ------------------------------------
+@router.post("/check-in", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
+async def check_in(
+    class_data: AttendanceCheckIn = Depends(),  # รับ class_id, lat, lon (ควรมี validation ช่วง -90..90/-180..180 ใน schema)
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-    A placeholder endpoint to test if the attendance router is working.
-    (You'll replace this with actual attendance record logic later.)
+    นักเรียนเช็คชื่อเข้าเรียนด้วยใบหน้าและตำแหน่ง (Proximity Check).
     """
-    return {"message": "Attendance endpoint is working! You should see attendance data here later."}
+    if not _has_role(current_user, "student"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only students can check in.")
+
+    # กัน content_type None และชนิดไฟล์ไม่ใช่รูป
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Only images are allowed.")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
+
+    # (ทางเลือก) ตรวจว่านักเรียนลงทะเบียนคลาสนี้จริงหรือไม่ – ทำใน service ก็ได้
+    # if not is_enrolled(db, current_user.user_id, class_data.class_id):
+    #     raise HTTPException(status_code=403, detail="Not enrolled in this class.")
+
+    attendance_record = record_check_in(
+        db=db,
+        class_id=class_data.class_id,
+        student_id=current_user.user_id,
+        image_bytes=image_bytes,
+        student_lat=class_data.latitude,
+        student_lon=class_data.longitude,
+    )
+    return attendance_record
+
+
+# ------------------------------------
+# 2. POST /attendance/teacher-location (Teacher: อัปเดต Anchor Point)
+# ------------------------------------
+@router.post("/teacher-location", status_code=status.HTTP_200_OK)
+async def update_teacher_location(
+    location_data: TeacherLocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    อาจารย์อัปเดตพิกัดล่าสุดของตนเองสำหรับ Relative Geofencing.
+    """
+    if not _has_role(current_user, "teacher"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only teachers can update their location.")
+
+    update_teacher_location_log(
+        db=db,
+        teacher_id=current_user.user_id,
+        class_id=location_data.class_id,
+        latitude=location_data.latitude,
+        longitude=location_data.longitude,
+    )
+    return {"message": "Teacher location updated successfully."}
+
+
+# ------------------------------------
+# 3. POST /attendance/student-tracking (Student: ส่งพิกัดต่อเนื่อง)
+# ------------------------------------
+@router.post("/student-tracking", status_code=status.HTTP_200_OK)
+async def track_student_location(
+    log_data: StudentLocationLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    บันทึกตำแหน่งของนักเรียนอย่างต่อเนื่องระหว่างคาบเรียน (Continuous Tracking).
+    """
+    if not _has_role(current_user, "student"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only students can track location.")
+
+    # (optional) rate-limit/debounce ตาม user+class (กัน spam insert)
+    # enforce_min_interval(db, current_user.user_id, log_data.class_id, seconds=10)
+
+    log_student_location(
+        db=db,
+        student_id=current_user.user_id,
+        class_id=log_data.class_id,
+        latitude=log_data.latitude,
+        longitude=log_data.longitude,
+    )
+    return {"message": "Student location logged successfully."}
+
+
+# ------------------------------------
+# 4. POST /attendance/re-verify (Student: ตอบสนองต่อการสุ่มตรวจซ้ำ)
+# ------------------------------------
+@router.post("/re-verify", status_code=status.HTTP_200_OK)
+async def re_verify_check_in(
+    class_data: AttendanceCheckIn = Depends(), # รับ class_id, lat, lon
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    นักเรียนตอบสนองต่อคำสั่งสุ่มตรวจสอบกลางคาบเรียน (Face ID + Location).
+    """
+    if "student" not in [role.name for role in current_user.roles]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    image_bytes = await file.read()
+    
+    # เรียกใช้ Service เพื่อจัดการ Logic การยืนยันซ้ำ
+    result = handle_reverification(
+        db=db, 
+        class_id=class_data.class_id, 
+        student_id=current_user.user_id, 
+        image_bytes=image_bytes,
+        student_lat=class_data.latitude,
+        student_lon=class_data.longitude
+    )
+    
+    return {"message": "Re-verification successful.", "status": result.status}
+
+
+
+# ------------------------------------
+# 5. PATCH /attendance/override/{attendance_id} (Teacher/Admin Only)
+# ------------------------------------
+@router.patch("/override/{attendance_id}", response_model=AttendanceResponse)
+async def override_attendance_status(
+    attendance_id: uuid.UUID = Path(..., description="UUID of the attendance record to override"),
+    override_data: AttendanceManualOverride = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    แก้ไขสถานะการเข้าเรียนด้วยมือ (Manual Override) โดย Teacher หรือ Admin.
+    """
+
+    roles = {r.name for r in getattr(current_user, "roles", [])}
+    is_admin = "admin" in roles
+    is_teacher = "teacher" in roles
+
+    if not (is_admin or is_teacher):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Only teachers or admins can modify attendance records.",
+        )
+
+    # ถ้าเป็นครู (ไม่ใช่แอดมิน) ต้องเป็นครูเจ้าของคลาสของ attendance record นี้เท่านั้น
+    if is_teacher and not is_admin:
+        att = (
+            db.query(Attendance)
+            .options(joinedload(Attendance.class_rel))  # ดึงคลาสมาด้วย
+            .filter(Attendance.attendance_id == attendance_id)
+            .first()
+        )
+        if not att:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendance not found.")
+        if att.class_rel.teacher_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only modify attendance for your own class."
+            )
+
+    # เรียก service (ภายในควร normalize enum -> string .value ให้ตรงกับ DB)
+    record = manual_override_attendance(
+        db=db,
+        attendance_id=attendance_id,
+        new_status=override_data.status,           # ให้ service จัดการ normalize
+        recorded_by_user_id=current_user.user_id,
+    )
+
+    # แปลง ORM -> Pydantic ให้ตรง response_model
+    try:
+        return AttendanceResponse.model_validate(record, from_attributes=True)  # Pydantic v2
+    except Exception:
+        return AttendanceResponse.from_orm(record)  # fallback Pydantic v1

@@ -73,7 +73,7 @@ def check_class_teacher(db: Session, class_id: uuid.UUID, user_id: uuid.UUID) ->
     return classroom
 
 
-def create_classroom(db: Session, name: str, teacher_id: uuid.UUID) -> ClassModel:
+def create_classroom(db: Session, name: str, teacher_id: uuid.UUID, start_time=None, end_time=None) -> ClassModel:
     """
     สร้างห้องเรียนใหม่ (generate code อัตโนมัติ) พร้อมจัดการเคส UNIQUE ชน
     - ถ้า code ชน UNIQUE → retry อัตโนมัติ
@@ -85,7 +85,9 @@ def create_classroom(db: Session, name: str, teacher_id: uuid.UUID) -> ClassMode
         new_class = ClassModel(
             name=name,
             code=unique_code,
-            teacher_id=teacher_id
+            teacher_id=teacher_id,
+            start_time=start_time,
+            end_time=end_time
         )
 
         try:

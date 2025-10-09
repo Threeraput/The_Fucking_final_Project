@@ -2,7 +2,7 @@
 import uuid
 from sqlalchemy import Column, ForeignKey, DateTime, Numeric, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship   # ✅ เพิ่มบรรทัดนี้
+from sqlalchemy.orm import relationship   
 from app.database import Base
 
 class StudentLocation(Base):
@@ -11,7 +11,7 @@ class StudentLocation(Base):
     """
     __tablename__ = "student_locations"
 
-    student_location_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    stdl_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     student_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.class_id", ondelete="CASCADE"), nullable=False)
     

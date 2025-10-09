@@ -11,7 +11,7 @@ class TeacherLocation(Base):
     """
     __tablename__ = "teacher_locations"
 
-    teacher_location_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tl_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey("classes.class_id", ondelete="CASCADE"), nullable=False)
     

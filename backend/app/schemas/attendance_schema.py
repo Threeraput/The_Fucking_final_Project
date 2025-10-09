@@ -45,7 +45,7 @@ class AttendanceResponse(BaseModel):
 
 class TeacherLocationResponse(BaseModel):
     """Response สำหรับข้อมูลตำแหน่งของอาจารย์"""
-    teacher_location_id: UUID
+    tl_id: UUID
     teacher_id: UUID
     class_id: UUID
     latitude: float
@@ -54,3 +54,12 @@ class TeacherLocationResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class AttendanceManualOverride(BaseModel):
+    """ใช้สำหรับ Teacher/Admin ในการแก้ไขสถานะการเข้าเรียน"""
+    status: AttendanceStatus 
+    # สถานะใหม่ที่ต้องการตั้งค่า (เช่น PRESENT, ABSENT, LATE, MANUAL_OVERRIDE)
+    
+    # เพิ่ม is_manual_override ใน Schema
+    is_manual_override: bool = True 
