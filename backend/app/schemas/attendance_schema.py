@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
+from fastapi import Form
 from app.models.attendance_enums import AttendanceStatus # นำเข้า Enum
 
 # -----------------
@@ -15,11 +16,18 @@ class LocationData(BaseModel):
     longitude: float = Field(..., ge=-180, le=180)
 
 class AttendanceCheckIn(BaseModel):
-    """Input สำหรับ Student Check-in"""
-    # เปลี่ยนจากการรับ class_id มาเป็น session_id
-    session_id: UUID 
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
+    session_id: UUID
+    latitude: float
+    longitude: float
+
+    @classmethod
+    def as_form(
+        cls,
+        session_id: UUID = Form(...),
+        latitude: float = Form(...),
+        longitude: float = Form(...),
+    ):
+        return cls(session_id=session_id, latitude=latitude, longitude=longitude)
 
 class TeacherLocationUpdate(LocationData):
     """ใช้สำหรับรับตำแหน่งล่าสุดของอาจารย์"""
@@ -64,3 +72,18 @@ class AttendanceManualOverride(BaseModel):
     
     # เพิ่ม is_manual_override ใน Schema
     is_manual_override: bool = True 
+    
+
+class ReverifyRequest(BaseModel):
+    session_id: UUID
+    latitude: float
+    longitude: float
+
+    @classmethod
+    def as_form(
+        cls,
+        session_id: UUID = Form(...),
+        latitude: float = Form(...),
+        longitude: float = Form(...),
+    ):
+        return cls(session_id=session_id, latitude=latitude, longitude=longitude)

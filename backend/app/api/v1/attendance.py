@@ -12,6 +12,7 @@ from app.schemas.attendance_schema import (
     TeacherLocationUpdate,
     StudentLocationLogCreate,
     AttendanceManualOverride,
+    ReverifyRequest, 
 )
 # ใช้อันเดียวให้ตรงทั้งโปรเจกต์
 from app.core.deps import get_current_user  # <- ถ้าคุณใช้ของ core.deps อยู่ที่อื่น
@@ -32,9 +33,10 @@ def _has_role(user: User, role_name: str) -> bool:
 # ------------------------------------
 # 1. POST /attendance/check-in (Student: Face ID + Proximity Check)
 # ------------------------------------
-@router.post("/check-in", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/check-in", response_model=AttendanceResponse)
 async def check_in(
-    class_data: AttendanceCheckIn = Depends(),  # รับ class_id, lat, lon (ควรมี validation ช่วง -90..90/-180..180 ใน schema)
+    # ใช้ as_form เพื่อให้ FastAPI ดึงค่าจาก multipart/form-data
+    class_data: AttendanceCheckIn = Depends(AttendanceCheckIn.as_form),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -42,24 +44,18 @@ async def check_in(
     """
     นักเรียนเช็คชื่อเข้าเรียนด้วยใบหน้าและตำแหน่ง (Proximity Check).
     """
-    if not _has_role(current_user, "student"):
+    if "student" not in [role.name for role in current_user.roles]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only students can check in.")
 
-    # กัน content_type None และชนิดไฟล์ไม่ใช่รูป
-    if not file.content_type or not file.content_type.startswith("image/"):
+    if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Only images are allowed.")
 
     image_bytes = await file.read()
-    if not image_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
 
-    # (ทางเลือก) ตรวจว่านักเรียนลงทะเบียนคลาสนี้จริงหรือไม่ – ทำใน service ก็ได้
-    # if not is_enrolled(db, current_user.user_id, class_data.class_id):
-    #     raise HTTPException(status_code=403, detail="Not enrolled in this class.")
-
+    #  เปลี่ยนมาใช้ session_id ตามการออกแบบล่าสุด
     attendance_record = record_check_in(
         db=db,
-        class_id=class_data.class_id,
+        session_id=class_data.session_id,
         student_id=current_user.user_id,
         image_bytes=image_bytes,
         student_lat=class_data.latitude,
@@ -124,12 +120,12 @@ async def track_student_location(
 # ------------------------------------
 # 4. POST /attendance/re-verify (Student: ตอบสนองต่อการสุ่มตรวจซ้ำ)
 # ------------------------------------
-@router.post("/re-verify", status_code=status.HTTP_200_OK)
+@router.post("/re-verify", response_model=AttendanceResponse, status_code=status.HTTP_200_OK)
 async def re_verify_check_in(
-    class_data: AttendanceCheckIn = Depends(), # รับ class_id, lat, lon
+    form: ReverifyRequest = Depends(ReverifyRequest.as_form),  # ← อ่านจาก multipart/form-data
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     นักเรียนตอบสนองต่อคำสั่งสุ่มตรวจสอบกลางคาบเรียน (Face ID + Location).
@@ -137,21 +133,25 @@ async def re_verify_check_in(
     if "student" not in [role.name for role in current_user.roles]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
 
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only images are allowed.")
+
     image_bytes = await file.read()
-    
-    # เรียกใช้ Service เพื่อจัดการ Logic การยืนยันซ้ำ
+
     result = handle_reverification(
-        db=db, 
-        class_id=class_data.class_id, 
-        student_id=current_user.user_id, 
+        db=db,
+        session_id=form.session_id,           # ← ใช้ session_id (ไม่ใช่ class_id)
+        student_id=current_user.user_id,
         image_bytes=image_bytes,
-        student_lat=class_data.latitude,
-        student_lon=class_data.longitude
+        student_lat=form.latitude,
+        student_lon=form.longitude,
     )
-    
-    return {"message": "Re-verification successful.", "status": result.status}
 
-
+    # ส่งคืนตาม schema ของคุณ (ถ้า AttendanceResponse ใช้ from_orm / model_validate)
+    try:
+        return AttendanceResponse.model_validate(result, from_attributes=True)
+    except Exception:
+        return AttendanceResponse.from_orm(result)
 
 # ------------------------------------
 # 5. PATCH /attendance/override/{attendance_id} (Teacher/Admin Only)

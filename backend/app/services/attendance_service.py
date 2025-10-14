@@ -2,6 +2,7 @@
 import io
 import uuid
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.attendance import Attendance
 from app.models.attendance_enums import AttendanceStatus
 from app.models.class_model import Class as ClassModel
+from app.models.attendance_session import AttendanceSession
 from app.schemas.attendance_schema import AttendanceResponse
 from app.services.face_recognition_service import get_face_embedding, compare_faces
 from app.services.location_service import (
@@ -38,18 +40,30 @@ def _ensure_aware_utc(dt: datetime | None) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+def calculate_attendance_status_for_session(
+    session_start_time: Optional[datetime],
+    session_end_time: Optional[datetime] = None,
+    late_threshold_minutes: int = 15,
+) -> AttendanceStatus:
+    """
+    คำนวณสถานะเทียบกับ 'เวลาเริ่มของ session'
+    - ก่อนหรือเท่ากับ start ⇒ PRESENT
+    - หลัง start แต่ภายใน grace (late_threshold_minutes) ⇒ LATE
+    - เลย grace ไป ⇒ ABSENT
+    - (ถ้าส่ง end_time มา ใช้ได้สำหรับ validation/decision อื่น ๆ ภายนอกฟังก์ชัน)
+    """
+    now = datetime.now(timezone.utc)
+    start = _ensure_aware_utc(session_start_time)
 
-def calculate_attendance_status(class_start_time: datetime) -> AttendanceStatus:
-    """คำนวณสถานะการเข้าเรียน (Present/Late/Absent) เทียบกับเวลาเริ่มคลาส (UTC)"""
-    current_time = datetime.now(timezone.utc)
-    class_start_time = _ensure_aware_utc(class_start_time)
-
-    LATE_THRESHOLD_MINUTES = 15
-    late_threshold_time = class_start_time + timedelta(minutes=LATE_THRESHOLD_MINUTES)
-
-    if current_time <= class_start_time:
+    # ถ้าไม่มี start ให้ถือว่า PRESENT (อยากกำหนดอย่างอื่นก็ปรับได้)
+    if start is None:
         return AttendanceStatus.PRESENT
-    elif current_time <= late_threshold_time:
+
+    late_deadline = start + timedelta(minutes=late_threshold_minutes)
+
+    if now <= start:
+        return AttendanceStatus.PRESENT
+    elif now <= late_deadline:
         return AttendanceStatus.LATE
     else:
         return AttendanceStatus.ABSENT
@@ -66,61 +80,49 @@ def _today_range_utc() -> tuple[datetime, datetime]:
 # ---------------------------
 def record_check_in(
     db: Session,
-    class_id: uuid.UUID,
+    session_id: uuid.UUID,
     student_id: uuid.UUID,
     image_bytes: bytes,
     student_lat: float,
     student_lon: float,
 ) -> AttendanceResponse:
-    """
-    ขั้นตอน:
-    1) ตรวจสอบคลาส
-    2) ดึงพิกัดล่าสุดของครู (anchor)
-    3) ตรวจ proximity (นักเรียนใกล้ครู)
-    4) Face verification
-    5) กันเช็คซ้ำภายในวันเดียวกัน (UTC)
-    6) คำนวณสถานะและบันทึก Attendance
-    """
+    # 1) โหลด session
+    session = (
+        db.query(AttendanceSession)
+        .filter(AttendanceSession.session_id == session_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendance session not found.")
 
-    # 1) ตรวจสอบ Class
-    classroom = db.query(ClassModel).filter(ClassModel.class_id == class_id).first()
-    if not classroom:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found.")
+    now = datetime.now(timezone.utc)
+    if session.end_time and now > session.end_time:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Check-in window for this session has closed.")
 
-    # 2) พิกัดครูล่าสุด
-    teacher_location = get_latest_teacher_location(db, classroom.teacher_id, class_id)
-
-    # Numeric(9,6) -> Decimal; แปลงเป็น float
-    t_lat = float(teacher_location.latitude)
-    t_lon = float(teacher_location.longitude)
-
-    # 3) ตรวจ proximity
+    # 2) ตรวจระยะจาก anchor point ใน session
+    t_lat = float(session.anchor_lat)
+    t_lon = float(session.anchor_lon)
     if not is_within_proximity(student_lat, student_lon, t_lat, t_lon):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Location check failed. You are too far from the classroom teacher.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Location check failed. You are too far from the classroom teacher.")
 
-    # 4) Face verification (ต้องมีรูป)
+    # 3) Face verification
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Image is required for check-in.")
-
     try:
-        new_embedding = get_face_embedding(io.BytesIO(image_bytes))
-        is_face_verified = compare_faces(db, student_id, new_embedding)
+        embedding = get_face_embedding(io.BytesIO(image_bytes))
+        is_face_verified = compare_faces(db, student_id, embedding)
     except HTTPException:
-        # ส่งต่อ error จาก face service เช่น "No face detected"
         raise
     except Exception:
-        # ผิดพลาดไม่คาดคิด -> ถือว่าไม่ผ่าน จะได้ไม่เกิด false positive
         is_face_verified = False
 
-    # 5) กันเช็คซ้ำภายใน "วันเดียวกัน" (UTC)
+    # 4) กันเช็คซ้ำภายในวันเดียวกัน (ตาม session + student)
     start_today, end_today = _today_range_utc()
     already = (
         db.query(Attendance)
         .filter(
-            Attendance.class_id == class_id,
+            Attendance.session_id == session_id,
             Attendance.student_id == student_id,
             Attendance.check_in_time >= start_today,
             Attendance.check_in_time < end_today,
@@ -128,33 +130,26 @@ def record_check_in(
         .first()
     )
     if already:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Attendance already recorded for today.",
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Attendance already recorded for today for this session.")
 
-    # 6) คำนวณสถานะ
+    # 5) คำนวณสถานะ
     status_to_record = AttendanceStatus.UNVERIFIED_FACE
     if is_face_verified:
-        start_time_utc = _ensure_aware_utc(classroom.start_time)
         status_to_record = (
-            calculate_attendance_status(start_time_utc)
-            if start_time_utc
-            else AttendanceStatus.PRESENT
+            calculate_attendance_status_for_session(session.start_time)
+            if session.start_time else AttendanceStatus.PRESENT
         )
 
-    # สร้างค่า status เป็น string ที่ DB ยอมรับแน่นอน
-    status_str = _normalize_status(status_to_record)
-
-    # Insert
+    # 6) บันทึก
     new_attendance = Attendance(
-        class_id=class_id,
+        class_id=session.class_id,       # ดึงจาก session
+        session_id=session.session_id,   # ต้องมีคอลัมน์นี้ในโมเดล + migration แล้ว
         student_id=student_id,
-        status=status_str,           # ← 'Present'/'Late'/... (ไม่ใช่ 'PRESENT')
+        status=status_to_record,         # ให้เป็น enum (SQLAlchemy แปลงให้)
         check_in_lat=student_lat,
         check_in_lon=student_lon,
     )
-
     try:
         db.add(new_attendance)
         db.commit()
@@ -163,60 +158,96 @@ def record_check_in(
         db.rollback()
         raise
 
-    # Pydantic v2/v1
+    # แปลงเป็น schema
     try:
-        return AttendanceResponse.model_validate(new_attendance, from_attributes=True)
+        return AttendanceResponse.model_validate(new_attendance, from_attributes=True)  # pydantic v2
     except Exception:
-        return AttendanceResponse.from_orm(new_attendance)
+        return AttendanceResponse.from_orm(new_attendance) 
     
 
 def handle_reverification(
-    db: Session, 
-    class_id: uuid.UUID, 
-    student_id: uuid.UUID, 
-    image_bytes: bytes, 
-    student_lat: float, 
-    student_lon: float
+    db: Session,
+    session_id: uuid.UUID,
+    student_id: uuid.UUID,
+    image_bytes: bytes,
+    student_lat: float,
+    student_lon: float,
 ) -> Attendance:
     """
-    จัดการการตอบสนองต่อคำสั่งสุ่มตรวจสอบ (Re-Verification).
+    จัดการการสุ่มตรวจซ้ำ (Re-Verification) ระหว่าง session ที่เปิดอยู่
+    - ยืนยันว่ามี attendance วันนี้ใน session เดียวกัน
+    - ตรวจระยะห่างจาก anchor ของ session
+    - ยืนยันใบหน้า
+    - อัปเดตสถานะ (ไม่เขียนทับเวลาของการเช็คอินครั้งแรก)
     """
-    # 1. ตรวจสอบว่านักเรียนได้เช็คอินแล้ววันนี้
-    existing_attendance = db.query(Attendance).filter(
-        Attendance.class_id == class_id,
-        Attendance.student_id == student_id
-        # (เพิ่ม Logic ตรวจสอบว่าเป็นการเข้าเรียนในวันเดียวกันหรือไม่)
-    ).order_by(Attendance.check_in_time.desc()).first()
 
-    if not existing_attendance or existing_attendance.status in [AttendanceStatus.ABSENT, AttendanceStatus.LEFT_EARLY]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have not checked in to this class yet, or your status is already finalized.")
+    # 1) ตรวจสอบ Session
+    session = db.query(AttendanceSession).filter(
+        AttendanceSession.session_id == session_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendance session not found.")
 
-    # 2. ตรวจสอบ Location Proximity (ซ้ำ)
-    classroom = existing_attendance.class_rel
-    teacher_location = get_latest_teacher_location(db, classroom.teacher_id, class_id)
-    if not is_within_proximity(student_lat, student_lon, teacher_location.latitude, teacher_location.longitude):
-         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Location check failed during re-verification.")
+    # (เลือกได้) บังคับให้ re-verify ได้เฉพาะช่วงที่ session ยังไม่หมดอายุ
+    if session.end_time and datetime.now(timezone.utc) > session.end_time:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Re-verification window has closed for this session.")
 
-    # 3. ยืนยันใบหน้า (Face Verification Logic)
+    # 2) หา attendance วันนี้ของนักเรียนใน session นี้
+    start_today, end_today = _today_range_utc()
+    attendance = (
+        db.query(Attendance)
+        .filter(
+            Attendance.session_id == session_id,
+            Attendance.student_id == student_id,
+            Attendance.check_in_time >= start_today,
+            Attendance.check_in_time < end_today,
+        )
+        .order_by(Attendance.check_in_time.desc())
+        .first()
+    )
+
+    if not attendance or attendance.status in (AttendanceStatus.ABSENT, AttendanceStatus.LEFT_EARLY):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active attendance to re-verify, or status already finalized."
+        )
+
+    # 3) ตรวจ Proximity เทียบกับ anchor ของ session
+    # anchor_lat/lon เป็น Numeric(9,6) -> แปลงเป็น float
+    anchor_lat = float(session.anchor_lat)
+    anchor_lon = float(session.anchor_lon)
+
+    # ระยะอย่างง่าย (ไม่มี dependency geopy):  ~111,000 m ต่อ 1 องศา
+    def _approx_distance_m(lat1, lon1, lat2, lon2) -> float:
+        return ((lat1-lat2)**2 + ((lon1-lon2) * 0.92)**2) ** 0.5 * 111_000
+
+    if _approx_distance_m(student_lat, student_lon, anchor_lat, anchor_lon) > 20.0:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Location check failed during re-verification.")
+
+    # 4) Face verification
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Image is required for re-verification.")
     try:
         new_embedding = get_face_embedding(io.BytesIO(image_bytes))
         is_face_verified = compare_faces(db, student_id, new_embedding)
-    except HTTPException as e:
-        raise e 
-    
+    except HTTPException:
+        raise
+    except Exception:
+        is_face_verified = False
+
+    # 5) อัปเดตสถานะ
     if not is_face_verified:
-        # ถ้า Face Verification ล้มเหลว ให้ตั้งสถานะเป็น Left_Early/Absent ทันที
-        existing_attendance.status = AttendanceStatus.LEFT_EARLY
-        
+        attendance.status = AttendanceStatus.LEFT_EARLY
+        attendance.is_reverified = True  # ยังถือว่าได้ทำ re-verify แล้ว แต่ไม่ผ่าน
     else:
-        # 4. ถ้าทุกอย่างผ่าน ให้อัปเดตสถานะการยืนยันซ้ำ
-        existing_attendance.is_reverified = True
-    
-    existing_attendance.check_in_time = datetime.now(timezone.utc) # อัปเดตเวลาล่าสุด
+        attendance.is_reverified = True
+        # แนะนำไม่แก้ check_in_time; ถ้าต้องการ timestamp ของ re-verify ให้เพิ่มคอลัมน์ reverified_at ในภายหลัง
+        # attendance.reverified_at = datetime.now(timezone.utc)  # (ถ้ามีคอลัมน์นี้)
+
+    db.add(attendance)
     db.commit()
-    db.refresh(existing_attendance)
-    
-    return existing_attendance
+    db.refresh(attendance)
+    return attendance
 
 def manual_override_attendance(
     db: Session, 
