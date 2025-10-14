@@ -11,6 +11,9 @@ import 'services/auth_service.dart';
 import 'screens/profile_screen.dart';
 import 'models/users.dart';
 import 'screens/notifications_page.dart';
+import 'screens/classwork_page.dart';
+import 'screens/people_page.dart';
+import 'screens/report_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final accessToken = await AuthService.getAccessToken();
@@ -75,6 +78,9 @@ class MyApp extends StatelessWidget {
               user: ModalRoute.of(context)!.settings.arguments as User,
             ),
         '/notifications': (context) => const NotificationsPage(),
+        
+        '/people': (context) => const PeoplePage(),
+        '/report': (context) => const ReportPage(),
       },
     );
   }

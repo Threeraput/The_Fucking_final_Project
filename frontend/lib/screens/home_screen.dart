@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/screens/course_detail_page.dart';
+import 'package:frontend/screens/createclass_screen.dart';
+import 'package:frontend/screens/joinclass_screen.dart';
 import 'package:frontend/screens/notifications_page.dart';
 import '../services/auth_service.dart';
 import '../models/users.dart';
@@ -69,58 +71,126 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _addCourseDialog() {
-    final _titleController = TextEditingController();
-    final _descController = TextEditingController();
-    final _locationController = TextEditingController();
+ void _showCourseOptions() {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // ปิด BottomSheet ก่อน
+                final newClass = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateClassPage()),
+                );
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Add New Course'),
-        content: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Course Name'),
+                // ถ้าได้ค่ากลับมา ให้เพิ่มลงใน List ของ Courses
+                if (newClass != null && newClass is Map<String, String>) {
+                  setState(() {
+                    _courses.add(newClass);
+                  });
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
               ),
-              TextField(
-                controller: _descController,
-                decoration: const InputDecoration(labelText: 'Description'),
+              child: const Text(
+                'Create Class',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
               ),
-              TextField(
-                controller: _locationController,
-                decoration: const InputDecoration(labelText: 'Location'),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const JoinClassPage()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
               ),
-            ],
-          ),
+              child: const Text(
+                'Join Class',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _courses.add({
-                  'title': _titleController.text,
-                  'icon': _titleController.text.isNotEmpty
-                      ? _titleController.text[0].toUpperCase()
-                      : '?',
-                  'desc': _descController.text,
-                  'location': _locationController.text,
-                });
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Add'),
-          ),
-        ],
+      );
+    },
+  );
+}
+
+
+// ฟังก์ชัน Dialog สำหรับกรอกข้อมูล Create Class
+void _showCreateClassDialog() {
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  final _locationController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Create New Class'),
+      content: SingleChildScrollView(
+        child: Column(
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Class Name'),
+            ),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(labelText: 'Description'),
+            ),
+            TextField(
+              controller: _locationController,
+              decoration: const InputDecoration(labelText: 'Location'),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _courses.add({
+                'title': _titleController.text,
+                'icon': _titleController.text.isNotEmpty
+                    ? _titleController.text[0].toUpperCase()
+                    : '?',
+                'desc': _descController.text,
+                'location': _locationController.text,
+              });
+            });
+            Navigator.pop(context);
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildDrawerItem({
     required String title,
@@ -156,30 +226,31 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         onTap: () {
-  setState(() {
-    currentPage = pageName; // อัปเดต Highlight
-  });
-  Navigator.pop(context); // ปิด Drawer
+          setState(() {
+            currentPage = pageName; // อัปเดต Highlight
+          });
+          Navigator.pop(context); // ปิด Drawer
 
-  if (pageName == 'Home') {
-    // อยู่หน้า Home แล้ว ไม่ต้อง push
-  } else if (pageName == 'Notifications') {
-    _showNotifications(context); // เปิดหน้า Notifications
-  } else if (courseData != null) {
-    // ถ้าเป็นห้องเรียน ส่งข้อมูลไปหน้า CourseDetail
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CourseDetailPage(course: courseData),
+          if (pageName == 'Home') {
+            // อยู่หน้า Home แล้ว ไม่ต้อง push
+          } else if (pageName == 'Notifications') {
+            _showNotifications(context); // เปิดหน้า Notifications
+          } else if (courseData != null) {
+            // ถ้าเป็นห้องเรียน ส่งข้อมูลไปหน้า CourseDetail
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CourseDetailPage(course: courseData),
+              ),
+            ).then((_) {
+              // กลับมาที่ Home แล้ว
+              setState(() {
+                currentPage = 'Home';
+              });
+            });
+          }
+        },
       ),
-    ).then((_) {
-      // กลับมาที่ Home แล้ว
-      setState(() {
-        currentPage = 'Home';
-      });
-    });
-  }
-},      ),
     );
   }
 
@@ -239,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.notifications,
                 pageName: 'Notifications',
               ),
-              
+
               const Divider(),
               // ห้องเรียน / Courses List
               Expanded(
@@ -328,14 +399,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               size: 18,
                             ),
                             onTap: () {
-                             Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CourseDetailPage(course: course),
-              ),
-            );
-          },
-                            
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      CourseDetailPage(course: course),
+                                ),
+                              );
+                            },
                           ),
                         );
                       },
@@ -347,9 +418,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // ปุ่มบวกเพิ่มห้องเรียน
       floatingActionButton: FloatingActionButton(
-        onPressed: _addCourseDialog,
-        backgroundColor: Colors.blueAccent,
+        onPressed: _showCourseOptions,
         child: const Icon(Icons.add),
+        tooltip: 'Add Course',
+        backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,  
       ),
     );
   }
