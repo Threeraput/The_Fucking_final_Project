@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship # <-- ตรวจสอบว่าม�
 from datetime import datetime, timezone
 from app.database import Base
 from app.models.association import user_roles, class_students # ตรวจสอบว่า import class_students ด้วย
+from app.models.attendance_session import AttendanceSession
 
 class User(Base):
     __tablename__ = "users"
@@ -56,6 +57,7 @@ class User(Base):
     otps = relationship("OTP", back_populates="user", cascade="all, delete-orphan")
     
     enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
-
+    # เพิ่มความสัมพันธ์สำหรับการเป็นผู้สอน/ผู้ประกาศ
+    attendance_sessions = relationship("AttendanceSession", back_populates="teacher", cascade="all, delete-orphan")
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"

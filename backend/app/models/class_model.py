@@ -21,6 +21,7 @@ class Class(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
+    attendance_sessions = relationship("AttendanceSession", back_populates="classroom", cascade="all, delete-orphan")
     teacher = relationship("User", back_populates="teaching_classes", foreign_keys=[teacher_id])
     students = relationship("User", secondary=class_students, back_populates="enrolled_classes")
     attendances = relationship("Attendance", back_populates="class_rel", cascade="all, delete-orphan")

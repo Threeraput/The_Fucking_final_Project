@@ -15,8 +15,9 @@ class LocationData(BaseModel):
     longitude: float = Field(..., ge=-180, le=180)
 
 class AttendanceCheckIn(BaseModel):
-    """ใช้เป็น Dependency เพื่อรับ class_id และ Location ในการเช็คอิน"""
-    class_id: UUID
+    """Input สำหรับ Student Check-in"""
+    # เปลี่ยนจากการรับ class_id มาเป็น session_id
+    session_id: UUID 
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
 

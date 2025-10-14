@@ -17,7 +17,7 @@ class Attendance(Base):
 
     check_in_time = Column(DateTime(timezone=True), default=func.now())
 
-    # 🔧 ใช้ค่า .value ของ enum ให้ตรงกับ enum type ใน Postgres
+    #  ใช้ค่า .value ของ enum ให้ตรงกับ enum type ใน Postgres
     status = Column(
         SAEnum(
             *[e.value for e in AttendanceStatus],   # -> "Present","Late","Absent",...
@@ -39,12 +39,15 @@ class Attendance(Base):
         ForeignKey("users.user_id", ondelete="SET NULL"),
         nullable=True
     )
-
+    # --- เพิ่ม FK ชี้ไปยัง Session ---
+    session_id = Column(UUID(as_uuid=True), ForeignKey("attendance_sessions.session_id", ondelete="CASCADE"), nullable=False)
     # Relationships
     class_rel = relationship("Class", back_populates="attendances")
     student = relationship("User", foreign_keys=[student_id], back_populates="attendances")
     recorder = relationship("User", foreign_keys=[recorded_by_user_id], back_populates="recorded_attendances")
 
+    attendance_session = relationship("AttendanceSession", back_populates="attendances", foreign_keys=[session_id])
+    
     def __repr__(self):
         return (
             f"<Attendance(student='{self.student_id}', class='{self.class_id}', "
