@@ -12,59 +12,80 @@ from app.services.location_service import update_teacher_location_log
 
 logger = logging.getLogger(__name__)
 
-def create_attendance_session(
-    db: Session, 
-    teacher_id: uuid.UUID, 
-    session_data: SessionOpenRequest
-) -> AttendanceSession:
-    """
-    สร้าง Session การเช็คชื่อใหม่ และบันทึก Anchor Point ของอาจารย์
-    """
-    now_utc = datetime.now(timezone.utc)
+# ค่ามาตรฐาน ถ้าไม่ส่งมาก็จะใช้ค่าพวกนี้
+DEFAULT_SESSION_MINUTES = 15          # ระยะเวลา session รวม ๆ เช่น เปิด 15 นาที
+DEFAULT_LATE_CUTOFF_MINUTES = 10      # ภายใน 10 นาทีแรก = Present, หลังจากนั้นจนหมด session = Late
 
-    # 1. ตรวจสอบ Class ID
+def _ensure_aware_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+def create_attendance_session(
+    db: Session,
+    teacher_id: uuid.UUID,
+    session_data,  # SessionOpenRequest
+) -> AttendanceSession:
+    # 1) ตรวจสอบว่า class มีจริง
     classroom = db.query(ClassModel).filter(ClassModel.class_id == session_data.class_id).first()
     if not classroom:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found.")
-        
-    # 2. ตรวจสอบ Session ซ้ำซ้อน
-    existing_active = db.query(AttendanceSession).filter(
-        AttendanceSession.class_id == session_data.class_id,
-        AttendanceSession.teacher_id == teacher_id,
-        AttendanceSession.end_time > now_utc
-    ).first()
-    if existing_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An active session already exists for this class.")
 
-    # 3. กำหนดเวลาสิ้นสุด (Default 15 นาที)
-    session_end_time = session_data.end_time or (now_utc + timedelta(minutes=15))
-    if session_end_time <= now_utc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End time must be in the future.")
+    now_utc = datetime.now(timezone.utc)
 
-    # 4. บันทึก Anchor Point
-    new_anchor_log = update_teacher_location_log(
+    # 2) กำหนดค่าเริ่มต้นให้ครบถ้วน (ถ้าไม่ส่งมา)
+    start_time = _ensure_aware_utc(session_data.start_time) if session_data.start_time else now_utc
+
+    # late_cutoff_time: ถ้าไม่ส่งมา ใช้ start_time + DEFAULT_LATE_CUTOFF_MINUTES
+    late_cutoff_time = (
+        _ensure_aware_utc(session_data.late_cutoff_time)
+        if getattr(session_data, "late_cutoff_time", None) else
+        start_time + timedelta(minutes=DEFAULT_LATE_CUTOFF_MINUTES)
+    )
+
+    # end_time: ถ้าไม่ส่งมา ใช้ start_time + DEFAULT_SESSION_MINUTES
+    end_time = (
+        _ensure_aware_utc(session_data.end_time)
+        if session_data.end_time else
+        start_time + timedelta(minutes=DEFAULT_SESSION_MINUTES)
+    )
+
+    # 3) ตรวจสอบลำดับเวลาให้ถูกต้อง
+    # ต้อง: start_time <= late_cutoff_time <= end_time
+    if not (start_time <= late_cutoff_time <= end_time):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid time range: must satisfy start_time <= late_cutoff_time <= end_time."
+        )
+
+    # 4) บันทึก anchor point ของอาจารย์ (optional แต่คุณใช้อยู่)
+    anchor_log = update_teacher_location_log(
         db=db,
         teacher_id=teacher_id,
         class_id=session_data.class_id,
         latitude=session_data.latitude,
-        longitude=session_data.longitude
+        longitude=session_data.longitude,
     )
 
-    # 5. สร้าง Session Record
+    # 5) สร้าง Session
     new_session = AttendanceSession(
         class_id=session_data.class_id,
         teacher_id=teacher_id,
-        start_time=now_utc,
-        end_time=session_end_time,
-        anchor_lat=new_anchor_log.latitude,
-        anchor_lon=new_anchor_log.longitude
+        start_time=start_time,
+        end_time=end_time,
+        late_cutoff_time=late_cutoff_time,  # ← อย่าลืมฟิลด์นี้ในโมเดล/ไมเกรชัน
+        anchor_lat=anchor_log.latitude,
+        anchor_lon=anchor_log.longitude,
     )
 
-    db.add(new_session)
-    db.commit()
-    db.refresh(new_session)
+    try:
+        db.add(new_session)
+        db.commit()
+        db.refresh(new_session)
+    except Exception:
+        db.rollback()
+        raise
 
-    logger.info(f"[Session Created] class={session_data.class_id} teacher={teacher_id} end={session_end_time}")
     return new_session
 
 

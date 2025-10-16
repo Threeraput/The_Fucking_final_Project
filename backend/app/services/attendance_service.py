@@ -21,59 +21,40 @@ from app.services.location_service import (
 # ---------------------------
 # Helpers
 # ---------------------------
-def _normalize_status(value) -> str:
-    """รีเทิร์นค่า string (.value) ที่ตรงกับ enum ใน DB เสมอ"""
-    if isinstance(value, AttendanceStatus):
-        return value.value
-    if isinstance(value, str):
-        # รองรับกรณีส่งมาเป็น "PRESENT"
-        try:
-            return AttendanceStatus[value].value
-        except KeyError:
-            return value  # เป็น "Present" อยู่แล้ว
-    raise ValueError("Invalid status type")
-
-def _ensure_aware_utc(dt: datetime | None) -> datetime | None:
-    """ทำให้ datetime เป็น timezone-aware (UTC) เสมอ เพื่อเทียบเวลาได้ถูกต้อง"""
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-def calculate_attendance_status_for_session(
-    session_start_time: Optional[datetime],
-    session_end_time: Optional[datetime] = None,
-    late_threshold_minutes: int = 15,
-) -> AttendanceStatus:
-    """
-    คำนวณสถานะเทียบกับ 'เวลาเริ่มของ session'
-    - ก่อนหรือเท่ากับ start ⇒ PRESENT
-    - หลัง start แต่ภายใน grace (late_threshold_minutes) ⇒ LATE
-    - เลย grace ไป ⇒ ABSENT
-    - (ถ้าส่ง end_time มา ใช้ได้สำหรับ validation/decision อื่น ๆ ภายนอกฟังก์ชัน)
-    """
-    now = datetime.now(timezone.utc)
-    start = _ensure_aware_utc(session_start_time)
-
-    # ถ้าไม่มี start ให้ถือว่า PRESENT (อยากกำหนดอย่างอื่นก็ปรับได้)
-    if start is None:
-        return AttendanceStatus.PRESENT
-
-    late_deadline = start + timedelta(minutes=late_threshold_minutes)
-
-    if now <= start:
-        return AttendanceStatus.PRESENT
-    elif now <= late_deadline:
-        return AttendanceStatus.LATE
-    else:
-        return AttendanceStatus.ABSENT
-
 def _today_range_utc() -> tuple[datetime, datetime]:
     """ช่วงเวลาเริ่ม-จบของ 'วันนี้' (UTC) สำหรับกันเช็คชื่อซ้ำ"""
     now = datetime.now(timezone.utc)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     return start, end
+
+def _ensure_aware_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+def decide_status_by_hard_times(
+    start: datetime,
+    late_cutoff: datetime,
+    end: datetime,
+    now: datetime | None = None,
+) -> AttendanceStatus:
+    now = _ensure_aware_utc(now or datetime.now(timezone.utc))
+    s = _ensure_aware_utc(start)
+    l = _ensure_aware_utc(late_cutoff)
+    e = _ensure_aware_utc(end)
+
+    if now > e:
+        return AttendanceStatus.ABSENT
+    if now < s:
+        return AttendanceStatus.PRESENT  
+    if (now >= s and now < l):
+        return AttendanceStatus.PRESENT
+    if (now >= l and now < e):
+        return AttendanceStatus.LATE
+    
+    return AttendanceStatus.ABSENT
+
 
 # ---------------------------
 # Main
@@ -93,20 +74,19 @@ def record_check_in(
         .first()
     )
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendance session not found.")
+        raise HTTPException(status_code=404, detail="Attendance session not found.")
 
     now = datetime.now(timezone.utc)
-    if session.end_time and now > session.end_time:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Check-in window for this session has closed.")
+    # ปิดหน้าต่างเช็คอินทันทีหากพ้น end_time
+    if now > _ensure_aware_utc(session.end_time):
+        raise HTTPException(status_code=400, detail="Check-in window for this session has closed.")
 
-    # 2) ตรวจระยะจาก anchor point ใน session
-    t_lat = float(session.anchor_lat)
-    t_lon = float(session.anchor_lon)
+    # 2) ตรวจระยะ anchor point
+    t_lat = float(session.anchor_lat); t_lon = float(session.anchor_lon)
     if not is_within_proximity(student_lat, student_lon, t_lat, t_lon):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Location check failed. You are too far from the classroom teacher.")
+        raise HTTPException(status_code=403, detail="Location check failed. You are too far from the classroom teacher.")
 
-    # 3) Face verification
+    # 3) Face verification (เหมือนเดิม)
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Image is required for check-in.")
     try:
@@ -117,36 +97,31 @@ def record_check_in(
     except Exception:
         is_face_verified = False
 
-    # 4) กันเช็คซ้ำภายในวันเดียวกัน (ตาม session + student)
-    start_today, end_today = _today_range_utc()
+    # 4) กันเช็คซ้ำภายใน session
     already = (
         db.query(Attendance)
         .filter(
             Attendance.session_id == session_id,
             Attendance.student_id == student_id,
-            Attendance.check_in_time >= start_today,
-            Attendance.check_in_time < end_today,
         )
         .first()
     )
     if already:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                            detail="Attendance already recorded for today for this session.")
+        raise HTTPException(status_code=409, detail="Attendance already recorded for this session.")
 
-    # 5) คำนวณสถานะ
+    # 5) สถานะตาม 3 จุดเวลา
     status_to_record = AttendanceStatus.UNVERIFIED_FACE
     if is_face_verified:
-        status_to_record = (
-            calculate_attendance_status_for_session(session.start_time)
-            if session.start_time else AttendanceStatus.PRESENT
+        status_to_record = decide_status_by_hard_times(
+            session.start_time, session.late_cutoff_time, session.end_time, now=now
         )
 
     # 6) บันทึก
     new_attendance = Attendance(
-        class_id=session.class_id,       # ดึงจาก session
-        session_id=session.session_id,   # ต้องมีคอลัมน์นี้ในโมเดล + migration แล้ว
+        class_id=session.class_id,
+        session_id=session.session_id,
         student_id=student_id,
-        status=status_to_record,         # ให้เป็น enum (SQLAlchemy แปลงให้)
+        status=status_to_record,
         check_in_lat=student_lat,
         check_in_lon=student_lon,
     )
@@ -158,12 +133,12 @@ def record_check_in(
         db.rollback()
         raise
 
-    # แปลงเป็น schema
+    # schema
     try:
-        return AttendanceResponse.model_validate(new_attendance, from_attributes=True)  # pydantic v2
+        return AttendanceResponse.model_validate(new_attendance, from_attributes=True)
     except Exception:
-        return AttendanceResponse.from_orm(new_attendance) 
-    
+        return AttendanceResponse.from_orm(new_attendance)
+
 
 def handle_reverification(
     db: Session,

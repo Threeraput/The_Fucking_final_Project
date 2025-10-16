@@ -1,6 +1,6 @@
 # backend/app/models/attendance_session.py
 import uuid
-from sqlalchemy import Column, ForeignKey, DateTime, func, Numeric
+from sqlalchemy import Column, ForeignKey, DateTime, func, Numeric, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -16,12 +16,19 @@ class AttendanceSession(Base):
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     
     # เวลาเต็ม (DateTime) ที่ใช้ในการตัดสินใจเช็คชื่อจริง
-    start_time = Column(DateTime(timezone=True), default=func.now())
+    start_time = Column(DateTime(timezone=True), default=func.now() , nullable=False)
+    late_cutoff_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False) 
     
     # Anchor Point สำหรับ Geofencing ณ เวลาประกาศ
     anchor_lat = Column(Numeric(9, 6), nullable=False)
     anchor_lon = Column(Numeric(9, 6), nullable=False)
+    
+    # คอนสเตรนต์ให้ลำดับเวลา valid
+    __table_args__ = (
+        CheckConstraint("start_time <= late_cutoff_time", name="ck_session_start_late"),
+        CheckConstraint("late_cutoff_time <= end_time", name="ck_session_late_end"),
+    )
 
     # Relationships
     classroom = relationship("Class", back_populates="attendance_sessions")

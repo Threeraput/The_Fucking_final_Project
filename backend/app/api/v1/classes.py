@@ -42,14 +42,14 @@ def _user_payload(u) -> Optional[Dict[str, Any]]:
         "username": getattr(u, "username", None),
         "email": getattr(u, "email", None),
 
-        # ✅ เติมฟิลด์ที่สคีมาต้องการ (จาก error)
+        #  เติมฟิลด์ที่สคีมาต้องการ (จาก error)
         "first_name": getattr(u, "first_name", None),
         "last_name": getattr(u, "last_name", None),
         "is_active": getattr(u, "is_active", None),
         "created_at": getattr(u, "created_at", None),
         "updated_at": getattr(u, "updated_at", None),
 
-        # ✅ roles เป็นชื่อ string
+        #  roles เป็นชื่อ string
         "roles": _role_names(u),
     }
 def _serialize_classroom(obj) -> ClassroomResponse:

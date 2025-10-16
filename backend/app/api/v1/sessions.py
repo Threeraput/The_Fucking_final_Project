@@ -24,27 +24,10 @@ async def open_attendance_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # ✅ ตรวจ role
-    if "teacher" not in [role.name for role in current_user.roles]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only teachers can open a check-in session.",
-        )
-
-    # ✅ ส่ง session_data ตรง ๆ ตาม signature ของ service
-    new_session = create_attendance_session(
-        db=db,
-        teacher_id=current_user.user_id,
-        session_data=session_data,
-    )
-
-    #  แปลง ORM -> Pydantic (กันปัญหา from_attributes)
-    try:
-        return SessionResponse.model_validate(new_session, from_attributes=True)
-    except Exception:
-        # fallback ถ้าเป็น Pydantic v1
-        return SessionResponse.from_orm(new_session)
-
+    if "teacher" not in [r.name for r in current_user.roles]:
+        raise HTTPException(status_code=403, detail="Only teachers can open a check-in session.")
+    new_session = create_attendance_session(db=db, teacher_id=current_user.user_id, session_data=session_data)
+    return new_session
 # ------------------------------------
 # 2) GET /sessions/active (ดู Session ที่ยังไม่หมดอายุ)
 # ------------------------------------
