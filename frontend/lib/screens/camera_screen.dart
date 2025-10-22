@@ -3,10 +3,10 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import '../utils/image_utils.dart'; // ✅ ใช้ยูทิลหมุน/ย่อภาพก่อนอัปโหลด
+import '../utils/image_utils.dart'; //  ใช้ยูทิลหมุน/ย่อภาพก่อนอัปโหลด
 import '../services/face_service.dart';
 import '../services/face_service.dart'
-    show ApiException; // ✅ จับ ApiException โดยตรง
+    show ApiException; //  จับ ApiException โดยตรง
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -61,7 +61,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   void _disposeController() {
     final c = _controller;
-    _controller = null; // ✅ เคลียร์อ้างอิงเสมอ
+    _controller = null; //  เคลียร์อ้างอิงเสมอ
     c?.dispose();
   }
 
@@ -77,7 +77,7 @@ class _CameraScreenState extends State<CameraScreen>
         controller.stopImageStream().catchError((_) {});
       }
       controller.dispose();
-      _controller = null; // ✅ กันใช้ instance ที่ถูก dispose ไปแล้ว
+      _controller = null; //  กันใช้ instance ที่ถูก dispose ไปแล้ว
     } else if (state == AppLifecycleState.resumed) {
       _controller = CameraController(
         widget.camera,
@@ -212,7 +212,7 @@ class _CameraScreenState extends State<CameraScreen>
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // ✅ เต็มจอแบบครอป (cover)
+                //  เต็มจอแบบครอป (cover)
                 return SizedBox.expand(
                   child: FittedBox(
                     fit: BoxFit.cover,

@@ -63,7 +63,7 @@ class FaceService {
       throw ApiException('Authentication token missing.', statusCode: 401);
     }
 
-    // ✅ path ที่ถูกต้อง (ไม่ซ้ำ prefix)
+    //  path ที่ถูกต้อง (ไม่ซ้ำ prefix)
     const path = '/face-recognition/face-recognition/upload-face';
 
     try {
@@ -112,7 +112,7 @@ class FaceService {
       throw ApiException('Authentication token missing.', statusCode: 401);
     }
 
-    // ✅ path ที่ถูกต้อง (ไม่ซ้ำ prefix)
+    //  path ที่ถูกต้อง (ไม่ซ้ำ prefix)
     const path = '/face-recognition/face-recognition/verify-face';
 
     try {
@@ -126,7 +126,7 @@ class FaceService {
       final code = res.statusCode;
 
       if (code == 200) {
-        // ✅ backend คืนคีย์ "matched"
+        // backend คืนคีย์ "matched"
         try {
           final data = json.decode(body);
           if (data is Map && data.containsKey('matched')) {
