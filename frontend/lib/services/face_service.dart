@@ -64,7 +64,7 @@ class FaceService {
     }
 
     //  path ที่ถูกต้อง (ไม่ซ้ำ prefix)
-    const path = '/face-recognition/face-recognition/upload-face';
+    const path = '/face-recognition/upload-face';
 
     try {
       final res = await _sendMultipart(
@@ -113,7 +113,7 @@ class FaceService {
     }
 
     //  path ที่ถูกต้อง (ไม่ซ้ำ prefix)
-    const path = '/face-recognition/face-recognition/verify-face';
+    const path = '/face-recognition/verify-face';
 
     try {
       final res = await _sendMultipart(

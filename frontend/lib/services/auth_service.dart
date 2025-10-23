@@ -12,7 +12,7 @@ class AuthService {
 
   static Future<Token?> login(String username, String password) async {
     // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
-    final url = Uri.parse('$API_BASE_URL/auth/auth/token');
+    final url = Uri.parse('$API_BASE_URL/auth/token');
     try {
       final response = await http.post(
         url,
@@ -41,7 +41,7 @@ class AuthService {
 
   static Future<User> register(Map<String, dynamic> userData) async {
     // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
-    final url = Uri.parse('$API_BASE_URL/auth/auth/register');
+    final url = Uri.parse('$API_BASE_URL/auth/register');
     try {
       final response = await http.post(
         url,
@@ -84,7 +84,7 @@ class AuthService {
 
   static Future<bool> requestOtp(String email) async {
     // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
-    final url = Uri.parse('$API_BASE_URL/auth/auth/request-otp');
+    final url = Uri.parse('$API_BASE_URL/auth/request-otp');
     try {
       final response = await http.post(
         url,
@@ -104,7 +104,7 @@ class AuthService {
   }
 
   static Future<bool> verifyOtp(String email, String otpCode) async {
-    final url = Uri.parse('$API_BASE_URL/auth/auth/verify-otp');
+    final url = Uri.parse('$API_BASE_URL/auth/verify-otp');
     try {
       final response = await http.post(
         url,
@@ -130,7 +130,7 @@ class AuthService {
     String newPassword,
   ) async {
     // แก้ไข: ลบ 'auth/' ที่ซ้ำกันออก
-    final url = Uri.parse('$API_BASE_URL/auth/auth/reset-password');
+    final url = Uri.parse('$API_BASE_URL/auth/reset-password');
     try {
       final response = await http.post(
         url,
@@ -155,7 +155,7 @@ class AuthService {
 
 
   static Future<List<User>> getPendingTeachers() async {
-    final url = Uri.parse('$API_BASE_URL/admin/admin/pending-teachers');
+    final url = Uri.parse('$API_BASE_URL/admin/pending-teachers');
     final accessToken = await getAccessToken();
     if (accessToken == null) {
       throw Exception('Not authenticated');
@@ -181,7 +181,7 @@ class AuthService {
   }
 
   static Future<void> approveTeacher(String userId) async {
-    final url = Uri.parse('$API_BASE_URL/admin/admin/users/$userId/approve-teacher');
+    final url = Uri.parse('$API_BASE_URL/admin/users/$userId/approve-teacher');
     final accessToken = await getAccessToken();
     if (accessToken == null) {
       throw Exception('Not authenticated');
