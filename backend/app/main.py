@@ -48,13 +48,13 @@ app.add_middleware(
 )
 
 # รวม API Routers
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-app.include_router(face_recognition.router, prefix="/api/v1/face-recognition", tags=["Face Recognition"])
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(face_recognition.router, prefix="/api/v1")
 # ถ้าคุณยังไม่ได้สร้าง routers อื่นๆ ให้ comment บรรทัดเหล่านี้ไว้ก่อน เพื่อป้องกัน ImportError
-app.include_router(classes.router, prefix="/api/v1/classes", tags=["Classes"])
-app.include_router(attendance.router, prefix="/api/v1/attendance", tags=["Attendance"])
-app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(classes.router, prefix="/api/v1")
+app.include_router(attendance.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(sessions.router, prefix="/api/v1")
 # --- Optional: Default root endpoint ---
