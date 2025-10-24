@@ -1,6 +1,7 @@
 // lib/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/classroom_home_screen.dart';
 import '../services/auth_service.dart';
 import '../models/users.dart';
 
@@ -86,7 +87,15 @@ class _HomeScreenState extends State<HomeScreen> {
               label: const Text('ยืนยันตัวตนด้วยใบหน้า'),
               onPressed: () => Navigator.pushNamed(context, '/verify-face'),
             ),
-          ],
+    ElevatedButton(
+      child: const Text('ไปยัง Classroom'),
+      onPressed: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
+        );
+      },
+    ),
+  ],
         ),
       ),
     );

@@ -6,7 +6,7 @@ import 'package:camera/camera.dart';
 import '../utils/image_utils.dart'; //  ใช้ยูทิลหมุน/ย่อภาพก่อนอัปโหลด
 import '../services/face_service.dart';
 import '../services/face_service.dart'
-    show ApiException; //  จับ ApiException โดยตรง
+    show ApiException; 
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -119,7 +119,7 @@ class _CameraScreenState extends State<CameraScreen>
       // ignore: avoid_print
       print("📸 Captured file: ${file.path} ($rawBytes bytes)");
 
-      // 2) ✅ หมุนตาม EXIF + ย่อ + บีบอัดก่อนส่ง (ตัวเลือก A: image)
+      // 2) หมุนตาม EXIF + ย่อ + บีบอัดก่อนส่ง (ตัวเลือก A: image)
       final normalizedPath = await normalizeAndSaveJpeg(
         file.path,
         maxWidth: 1600,
@@ -154,13 +154,13 @@ class _CameraScreenState extends State<CameraScreen>
       } else {
         final resp = await FaceService.uploadFace(normalizedPath);
         // ignore: avoid_print
-        print("✅ Upload response: $resp");
+        print(" Upload response: $resp");
         if (!mounted) return;
         _showResultDialog('อัปโหลดใบหน้าสำเร็จ', Colors.green);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showResultDialog(e.message, Colors.red); // ✅ โชว์ข้อความจาก backend
+      _showResultDialog(e.message, Colors.red); //  โชว์ข้อความจาก backend
     } catch (e) {
       if (!mounted) return;
       _showResultDialog('เกิดข้อผิดพลาด: $e', Colors.red);

@@ -1,13 +1,11 @@
 // File: lib/services/class_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-
 import '../models/classroom.dart';
 import 'auth_service.dart' show AuthService; // ใช้เฉพาะ getAccessToken()
 
 //  ตั้ง BASE_URL ไว้ในไฟล์นี้ ไม่ต้อง import จาก auth_service.dart
 const String API_BASE_URL = 'http://192.168.0.200:8000/api/v1';
-
 class ClassService {
   // ===== Headers + Error Handler =====
   static Future<Map<String, String>> _headers() async {
@@ -59,18 +57,33 @@ class ClassService {
   }
 
   /// 3) POST /classes/join (นักเรียนเข้าร่วมด้วย code)
-  static Future<String> joinClassroom(String code) async {
+  static Future<void> joinClassroom(String code) async {
+    final token = await AuthService.getAccessToken();
     final url = Uri.parse('$API_BASE_URL/classes/join');
+
     final res = await http.post(
       url,
-      headers: await _headers(),
-      body: json.encode(ClassroomJoin(code).toJson()),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: json.encode({'code': code}),
     );
+
     if (res.statusCode == 200) {
-      final m = json.decode(res.body);
-      return m['message']?.toString() ?? 'Successfully joined the classroom.';
+      return; // สำเร็จ ไม่ต้องทำอะไรเพิ่ม
     }
-    throw _errorFrom(res);
+
+    // ถ้าเกิด error จาก backend
+    String message = 'เข้าร่วมคลาสไม่สำเร็จ';
+    try {
+      final data = json.decode(res.body);
+      if (data['detail'] != null) {
+        message = data['detail'];
+      }
+    } catch (_) {}
+
+    throw Exception(message);
   }
 
   /// 4) DELETE /classes/{class_id}/students/{student_id}
@@ -115,4 +128,18 @@ class ClassService {
     }
     throw _errorFrom(res);
   }
+/// NEW: GET /classes/enrolled - รายการคลาสที่นักเรียนเข้าร่วม
+  static Future<List<Classroom>> getJoinedClasses() async {
+    final url = Uri.parse('$API_BASE_URL/classes/enrolled');
+    final res = await http.get(url, headers: await _headers());
+    if (res.statusCode == 200) {
+      final list = (json.decode(res.body) as List).cast<dynamic>();
+      return list
+          .map((e) => Classroom.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw _errorFrom(res);
+  }
 }
+
+

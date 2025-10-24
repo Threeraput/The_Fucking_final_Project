@@ -312,3 +312,9 @@ def get_classroom_with_relations(db: Session, class_id: uuid.UUID):
         )
     )
     return db.scalars(stmt).first()
+
+def get_enrolled_classes(db: Session, student_id: uuid.UUID):
+    student = db.query(User).filter(User.user_id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+    return student.enrolled_classes  # จาก relationship ใน model

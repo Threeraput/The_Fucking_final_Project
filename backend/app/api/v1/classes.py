@@ -203,6 +203,21 @@ async def delete_classroom(
     return None
 
 
+@router.get("/enrolled", response_model=List[ClassroomResponse])
+async def get_enrolled_classes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # ต้องเป็นนักเรียนเท่านั้น
+    if not _has_any_role(current_user, {"student"}):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can view enrolled classes.",
+        )
+
+    classes = class_service.get_enrolled_classes(db, current_user.user_id)
+    return _serialize_classroom_list(classes)
+
 
 @router.get("/{class_id}", response_model=ClassroomResponse)
 async def get_classroom_details(
@@ -227,3 +242,4 @@ async def get_classroom_details(
 
     # แปลงเป็น schema อย่างปลอดภัย (ไม่แตะต้อง ORM)
     return _serialize_classroom(classroom)
+
