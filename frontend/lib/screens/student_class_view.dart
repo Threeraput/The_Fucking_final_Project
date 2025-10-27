@@ -1,119 +1,194 @@
 import 'package:flutter/material.dart';
 
-class StudentClassView extends StatelessWidget {
-  final String classId; // เผื่อใช้ภายหลัง
+class StudentClassView extends StatefulWidget {
+  final String classId;
   final String className;
-  final String? teacherName;
+  final String teacherName;
 
   const StudentClassView({
     super.key,
     required this.classId,
     required this.className,
-    this.teacherName,
+    required this.teacherName,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Scaffold(
-      appBar: AppBar(title: const Text('รายละเอียดคลาส (นักเรียน)')),
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          // Banner โทน Google Classroom
-          Container(
-            height: 140,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [primary.withOpacity(0.9), primary.withOpacity(0.6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Stack(
-              children: [
-                Positioned(
-                  right: -10,
-                  top: -10,
-                  child: Icon(
-                    Icons.class_,
-                    size: 120,
-                    color: Colors.white.withOpacity(0.15),
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      className,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _pill(Icons.person_outline, teacherName ?? '-'),
-                  ],
-                ),
-              ],
-            ),
-          ),
+  State<StudentClassView> createState() => _StudentClassViewState();
+}
 
-          // เนื้อหาที่อนุญาต (ไม่เรียก API เพิ่ม)
-          Padding(
+class _StudentClassViewState extends State<StudentClassView> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.className)),
+       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color.fromARGB(
+          255,
+          255,
+          255,
+          255,
+        ), // 🔹 พื้นหลัง
+        selectedItemColor: const Color.fromARGB(
+          255,
+          65,
+          171,
+          179,
+        ), // 🔹 สีไอคอนและข้อความที่เลือก
+        unselectedItemColor: const Color.fromARGB(
+          255,
+          39,
+          39,
+          39,
+        ), // 🔹 สีไอคอนที่ไม่ได้เลือก
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _currentIndex,
+        onTap: (i) => setState(() => _currentIndex = i),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.forum_outlined),
+            label: 'Stream',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_outlined),
+            label: 'Classwork',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_outlined),
+            label: 'Report',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            label: 'People',
+          ),
+        ],
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return _StudentStreamTab(
+          className: widget.className,
+          teacherName: widget.teacherName,
+        );
+      case 1:
+        return const _StudentClassworkTab();
+      case 2:
+        return const _StudentReportTab();
+      case 3:
+        return _StudentPeopleTab(teacherName: widget.teacherName);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+class _StudentStreamTab extends StatelessWidget {
+  final String className;
+  final String teacherName;
+  const _StudentStreamTab({required this.className, required this.teacherName});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'ข้อมูลพื้นฐาน',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(className, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
-                _row('ชื่อคลาส', className),
-                _row('อาจารย์ผู้สอน', teacherName ?? '-'),
+                Text('Teacher: $teacherName'),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pill(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(color: Colors.white)),
-        ],
-      ),
-    );
-  }
-
-  Widget _row(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+        ),
+        const SizedBox(height: 16),
+        Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('No announcements yet.'),
           ),
-          Expanded(child: Text(value)),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StudentClassworkTab extends StatelessWidget {
+  const _StudentClassworkTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Classwork — งานที่ได้รับมอบหมายจะอยู่ที่นี่',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
       ),
+    );
+  }
+}
+
+class _StudentReportTab extends StatelessWidget {
+  const _StudentReportTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Report — สถิติการเข้าเรียนของฉันจะอยู่ที่นี่',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentPeopleTab extends StatelessWidget {
+  final String teacherName;
+  const _StudentPeopleTab({required this.teacherName});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Teacher', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.person)),
+          title: Text(teacherName),
+        ),
+        const SizedBox(height: 12),
+        Text('Students', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('จะแสดงรายชื่อเพื่อนร่วมชั้นเมื่อ API พร้อม'),
+          ),
+        ),
+      ],
     );
   }
 }

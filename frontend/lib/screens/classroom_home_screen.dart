@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 import 'package:frontend/models/users.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/services/auth_service.dart';
@@ -7,6 +8,8 @@ import 'class_details_screen.dart';
 import 'create_class_screen.dart';
 import 'join_class_sheet.dart';
 import 'student_class_view.dart';
+import '../screens/camera_screen.dart';
+import '../services/face_service.dart';
 
 class ClassroomHomeScreen extends StatefulWidget {
   const ClassroomHomeScreen({super.key});
@@ -83,23 +86,42 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   }
 
   Drawer _buildDrawer() {
+    final me = _me;
+
+    // ถ้ายังโหลดข้อมูล user ไม่เสร็จ — ไม่แสดง Drawer
+    if (me == null) {
+      return const Drawer(child: Center(child: CircularProgressIndicator()));
+    }
+
+    // เช็คว่าเป็น student หรือไม่
+    final isStudent = me.roles.any((r) => r.toLowerCase() == 'student');
+
     return Drawer(
       child: SafeArea(
         child: Column(
           children: [
+            // 🔹 ส่วนหัว
             UserAccountsDrawerHeader(
-              accountName: Text(_me?.username ?? 'ไม่ทราบชื่อ'),
-              accountEmail: Text(_me?.email ?? ''),
+              accountName: Text(me.username ?? 'ไม่ทราบชื่อ'),
+              accountEmail: Text(me.email ?? ''),
               currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.blueAccent,
+                backgroundColor: Colors.deepOrangeAccent,
                 child: Text(
-                  (_me?.username?.isNotEmpty == true ? _me!.username![0] : '?')
+                  (me.username?.isNotEmpty == true ? me.username![0] : '?')
                       .toUpperCase(),
                   style: const TextStyle(fontSize: 24, color: Colors.white),
                 ),
               ),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blueAccent, Colors.lightBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
             ),
-            //  ส่วนเมนูหลัก (ขยายได้)
+
+            // 🔹 เมนูหลัก
             Expanded(
               child: ListView(
                 children: [
@@ -119,6 +141,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                     onTap: () {},
                   ),
                   const Divider(),
+
+                  // 🔹 เมนูเฉพาะอาจารย์
                   if (_isTeacher)
                     ListTile(
                       leading: const Icon(Icons.add_circle_outline),
@@ -128,6 +152,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                         _openCreate();
                       },
                     ),
+
+                  // 🔹 เมนูเฉพาะนักเรียน
                   if (!_isTeacher)
                     ListTile(
                       leading: const Icon(Icons.group_add),
@@ -137,19 +163,85 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                         _openJoin();
                       },
                     ),
+
+                  // 🔹 เพิ่ม/ลบใบหน้า — เฉพาะนักเรียน
+                  if (isStudent) ...[
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.face_retouching_natural),
+                      title: const Text('เพิ่มใบหน้า'),
+                      onTap: () async {
+                       Navigator.pushReplacementNamed(context, '/upload-face');
+                      },
+                    ),
+                   ListTile(
+                      leading: const Icon(Icons.delete_forever),
+                      title: const Text('ลบใบหน้า'),
+                      onTap: () async {
+                        Navigator.pop(context);
+
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            title: const Text(
+                              'ยืนยันการลบข้อมูลใบหน้า',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            content: const Text(
+                              'คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลใบหน้าของคุณออกจากระบบ?\n'
+                              'การกระทำนี้ไม่สามารถกู้คืนได้',
+                              style: TextStyle(fontSize: 15),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('ยกเลิก'),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('ลบ'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirmed == true) {
+                          try {
+                            await FaceService.deleteFace();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('ลบข้อมูลใบหน้าสำเร็จ'),
+                              ),
+                            );
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('ลบข้อมูลใบหน้าไม่สำเร็จ: $e'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
+
             const Divider(),
-            //  ปุ่ม Logout อยู่ล่างสุด
+
+            // 🔹 ปุ่มออกจากระบบ
             Padding(
               padding: const EdgeInsets.only(bottom: 12.0),
               child: ListTile(
-                leading: const Icon(Icons.logout,),
-                title: const Text(
-                  'ออกจากระบบ',
-                  style: TextStyle(),
-                ),
+                leading: const Icon(Icons.logout),
+                title: const Text('ออกจากระบบ'),
                 onTap: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
@@ -171,11 +263,10 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
 
                   if (confirmed == true) {
                     await AuthService.logout();
-                    if (mounted) {
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/login', //  ไปหน้า Login ใหม่
-                        (route) => false,
-                      );
+                    if (context.mounted) {
+                      Navigator.of(
+                        context,
+                      ).pushNamedAndRemoveUntil('/login', (route) => false);
                     }
                   }
                 },
@@ -186,6 +277,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +333,7 @@ class _TeacherClasses extends StatelessWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: data.length,
-            itemBuilder: (_, i) => _ClassCard(c: data[i], isTeacher: true),
+            itemBuilder: (_, i) => _ClassCard(c: data[i], isTeacher: true  , onRefresh: onRefresh),
           ),
         );
       },
@@ -277,7 +369,7 @@ class _StudentClasses extends StatelessWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: data.length,
-            itemBuilder: (_, i) => _ClassCard(c: data[i], isTeacher: false),
+            itemBuilder: (_, i) => _ClassCard(c: data[i], isTeacher: false , onRefresh: onRefresh),
           ),
         );
       },
@@ -318,11 +410,13 @@ class _EmptyState extends StatelessWidget {
 class _ClassCard extends StatelessWidget {
   final Classroom c;
   final bool isTeacher;
-  const _ClassCard({required this.c, required this.isTeacher});
+  final Future<void> Function()? onRefresh;
+  const _ClassCard({required this.c, required this.isTeacher, this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
     final color = Colors.primaries[c.name.hashCode % Colors.primaries.length];
+
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 4,
@@ -351,28 +445,139 @@ class _ClassCard extends StatelessWidget {
             );
           }
         },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                c.name ?? '(ไม่มีชื่อคลาส)',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
+        child: Stack(
+          children: [
+            // 🔹 เพิ่ม popup menu ตรงนี้
+            Positioned(
+              top: 4,
+              right: 4,
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    // แก้ไขคลาส (เฉพาะอาจารย์)
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CreateClassScreen(editing: c),
+                      ),
+                    );
+                    if (updated == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('แก้ไขคลาสสำเร็จ')),
+                      );
+                      onRefresh?.call();
+                    }
+                  } else if (value == 'delete') {
+                    // ลบคลาส
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('ยืนยันการลบ'),
+                        content: Text('ต้องการลบ "${c.name}" ใช่หรือไม่?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('ลบ'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      try {
+                        await ClassService.deleteClassroom(c.classId!);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('ลบคลาสสำเร็จ')),
+                          );
+                          onRefresh?.call();
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('ลบไม่สำเร็จ: $e')),
+                        );
+                      }
+                    }
+                  } else if (value == 'leave') {
+                    // นักเรียนออกจากคลาส
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('ออกจากคลาส'),
+                        content: Text('ต้องการออกจาก "${c.name}" ใช่หรือไม่?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('ออกจากคลาส'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      try {
+                        await ClassService.leaveClassroom(c.classId!);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('ออกจากคลาสสำเร็จ')),
+                          );
+                          onRefresh?.call();
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('ออกจากคลาสไม่สำเร็จ: $e')),
+                        );
+                      }
+                    }
+                  }
+                },
+                itemBuilder: (_) => isTeacher
+                    ? const [
+                        PopupMenuItem(value: 'edit', child: Text('แก้ไขคลาส')),
+                        PopupMenuItem(value: 'delete', child: Text('ลบคลาส')),
+                      ]
+                    : const [
+                        PopupMenuItem(
+                          value: 'leave',
+                          child: Text('ออกจากคลาส'),
+                        ),
+                      ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                c.teacher?.username ?? c.teacher?.email ?? '',
-                style: TextStyle(color: Colors.white.withOpacity(0.9)),
+            ),
+
+            // 🔹 ส่วนเนื้อหาเดิมทั้งหมด
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    c.name ?? '(ไม่มีชื่อคลาส)',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    c.teacher?.username ?? c.teacher?.email ?? '',
+                    style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+

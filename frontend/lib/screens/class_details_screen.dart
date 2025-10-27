@@ -1,252 +1,297 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
+import 'package:frontend/screens/create_announcement_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
 import 'create_class_screen.dart';
 
+
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
-  const ClassDetailsScreen({super.key, required this.classId});
+  final String? className; // เผื่อส่งชื่อมาจาก Card
+
+  const ClassDetailsScreen({super.key, required this.classId, this.className});
 
   @override
   State<ClassDetailsScreen> createState() => _ClassDetailsScreenState();
 }
 
 class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
-  late Future<Classroom> _future;
-  User? _me;
+  int _currentIndex = 0;
+  bool _loading = true;
+  bool _error = false;
+  bool _isTeacher = false;
 
-  bool get _isTeacher =>
-      _me?.roles.contains('teacher') == true ||
-      _me?.roles.contains('admin') == true;
+  Classroom? _classroom;
+  User? _me;
 
   @override
   void initState() {
     super.initState();
-    _future = ClassService.getClassroomDetails(widget.classId);
-    _loadMe();
+    _bootstrap();
   }
 
-  Future<void> _loadMe() async {
-    final u = await AuthService.getCurrentUserFromLocal();
-    setState(() => _me = u);
-  }
-
-  Future<void> _refresh() async {
-    setState(() => _future = ClassService.getClassroomDetails(widget.classId));
-  }
-
-  Future<void> _removeStudent(String studentId) async {
+  Future<void> _bootstrap() async {
     try {
-      await ClassService.removeStudent(widget.classId, studentId);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('ลบนักเรียนแล้ว')));
-        _refresh();
+      final me = await AuthService.getCurrentUserFromLocal();
+      final isTeacher =
+          me?.roles.contains('teacher') == true ||
+          me?.roles.contains('admin') == true;
+      Classroom? cls;
+      if (isTeacher) {
+        // teacher/admin เข้าถึงรายละเอียดคลาสได้
+        cls = await ClassService.getClassroomDetails(widget.classId);
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('ลบไม่สำเร็จ: $e')));
-      }
+      setState(() {
+        _me = me;
+        _isTeacher = isTeacher;
+        _classroom = cls;
+        _loading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
     }
   }
 
-  Future<void> _deleteClass() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ลบคลาสนี้?'),
-        content: const Text('การลบนี้เป็นการลบถาวร'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('ลบ'),
-          ),
-        ],
+  void _openCreateAnnouncement() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateAnnouncementScreen(
+          classId: widget.classId,
+          className: _classroom?.name ?? widget.className ?? 'Class',
+        ),
       ),
     );
-    if (ok != true) return;
-    try {
-      await ClassService.deleteClassroom(widget.classId);
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('ลบไม่สำเร็จ: $e')));
-      }
-    }
-  }
-
-  Future<void> _editClass(Classroom c) async {
-    final updated = await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => CreateClassScreen(editing: c)));
-    if (updated != null) _refresh();
+    // TODO: หลังประกาศเสร็จ เรียกโหลด feed ใหม่ได้ ถ้ามี service แล้ว
   }
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final title = _classroom?.name ?? widget.className ?? 'Classroom';
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('รายละเอียดคลาส'),
-        actions: [
-          if (_isTeacher)
-            IconButton(onPressed: _deleteClass, icon: const Icon(Icons.delete)),
+      appBar: AppBar(title: Text(title)),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error
+          ? const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'))
+          : _buildBody(),
+    bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255), // 🔹 พื้นหลัง
+        selectedItemColor: const Color.fromARGB(255, 65, 171, 179), // 🔹 สีไอคอนและข้อความที่เลือก
+        unselectedItemColor: const Color.fromARGB(255, 39, 39, 39), // 🔹 สีไอคอนที่ไม่ได้เลือก
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _currentIndex,
+        onTap: (i) => setState(() => _currentIndex = i),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.forum_outlined),
+            label: 'Stream',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_outlined),
+            label: 'Classwork',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_outlined),
+            label: 'Report',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            label: 'People',
+          ),
         ],
-      ),
-      body: FutureBuilder<Classroom>(
-        future: _future,
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            if (snap.hasError) {
-              return Center(child: Text('Error: ${snap.error}'));
-            }
-            return const Center(child: CircularProgressIndicator());
-          }
-          final c = snap.data!;
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                // Banner เหมือน Google Classroom
-                Container(
-                  height: 140,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        primary.withOpacity(0.9),
-                        primary.withOpacity(0.6),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        right: -10,
-                        top: -10,
-                        child: Icon(
-                          Icons.class_,
-                          size: 120,
-                          color: Colors.white.withOpacity(0.15),
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            c.name ?? '(no name)',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              _pill(Icons.key, c.code ?? '-'),
-                              const SizedBox(width: 8),
-                              _pill(
-                                Icons.person_outline,
-                                c.teacher?.username ?? c.teacher?.email ?? '-',
-                              ),
-                              const Spacer(),
-                              if (_isTeacher)
-                                IconButton(
-                                  onPressed: () => _editClass(c),
-                                  icon: const Icon(
-                                    Icons.edit,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // เนื้อหา
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if ((c.description ?? '').isNotEmpty) ...[
-                        Text(
-                          'คำอธิบาย',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(c.description!),
-                        const SizedBox(height: 16),
-                      ],
-                      Text(
-                        'นักเรียน (${c.students.length})',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      if (c.students.isEmpty)
-                        const Text('ยังไม่มีนักเรียนในคลาสนี้')
-                      else
-                        ...c.students.map(
-                          (s) => Card(
-                            child: ListTile(
-                              leading: const CircleAvatar(
-                                child: Icon(Icons.person),
-                              ),
-                              title: Text(s.username ?? s.email ?? s.userId),
-                              subtitle: Text(s.roles.join(', ')),
-                              trailing: _isTeacher
-                                  ? IconButton(
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                      ),
-                                      onPressed: () => _removeStudent(s.userId),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }
 
-  Widget _pill(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return _StreamTab(
+          classroom: _classroom,
+          isTeacher: _isTeacher,
+          onCreateAnnouncement: _openCreateAnnouncement,
+        );
+      case 1:
+        return const _ClassworkTab();
+      case 2:
+        return const _ReportTab();
+      case 3:
+        return _PeopleTab(classroom: _classroom);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+class _StreamTab extends StatelessWidget {
+  final Classroom? classroom;
+  final bool isTeacher;
+  final VoidCallback onCreateAnnouncement;
+
+  const _StreamTab({
+    required this.classroom,
+    required this.isTeacher,
+    required this.onCreateAnnouncement,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = classroom;
+    return RefreshIndicator(
+      onRefresh: () async {
+        // ไว้รีเฟรชประกาศ เมื่อมี service ประกาศ
+        await Future.delayed(const Duration(milliseconds: 400));
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(text, style: const TextStyle(color: Colors.white)),
+          if (c != null)
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      c.name ?? '—',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Code: ${c.code ?? '-'}'),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Teacher: ${c.teacher?.username ?? c.teacher?.email ?? '-'}',
+                    ),
+                    if ((c.description ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(c.description!),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          if (isTeacher) ...[
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: onCreateAnnouncement,
+              icon: const Icon(Icons.campaign),
+              label: const Text('Create Announcement'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          // TODO: แสดงรายการประกาศจริงเมื่อมี service
+          Card(
+            margin: const EdgeInsets.only(top: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No announcements yet.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ClassworkTab extends StatelessWidget {
+  const _ClassworkTab();
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: อาจารย์สร้างงาน/นักเรียนดูงาน-ส่งงาน เมื่อมี API พร้อม
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Classwork — สร้าง/ส่งงาน จะอยู่ที่นี่',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportTab extends StatelessWidget {
+  const _ReportTab();
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: แสดงสถิติขาด/ลา/มาสายจาก API report
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Report — สถิติการเช็คชื่อ จะอยู่ที่นี่',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _PeopleTab extends StatelessWidget {
+  final Classroom? classroom;
+  const _PeopleTab({required this.classroom});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = classroom;
+    if (c == null) {
+      return const Center(child: Text('ไม่มีข้อมูลสมาชิกในคลาส'));
+    }
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Teacher', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.person)),
+          title: Text(c.teacher?.username ?? c.teacher?.email ?? '-'),
+          subtitle: Text(c.teacher?.email ?? ''),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Students (${c.students.length})',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        if (c.students.isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('ยังไม่มีนักเรียน'),
+            ),
+          ),
+        ...c.students.map(
+          (s) => ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+            title: Text(s.username ?? s.email ?? '-'),
+            subtitle: Text(s.email ?? ''),
+          ),
+        ),
+      ],
     );
   }
 }

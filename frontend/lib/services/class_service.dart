@@ -140,6 +140,36 @@ class ClassService {
     }
     throw _errorFrom(res);
   }
+  // 🔹 นักเรียนออกจากคลาส static Future<void> leaveClassroom(String classId) async {
+   static Future<void> leaveClassroom(String classId) async {
+    final token = await AuthService.getAccessToken();
+    final user = await AuthService.getCurrentUserFromLocal();
+    if (user == null) throw Exception('ไม่พบข้อมูลผู้ใช้ในระบบ');
+
+    final studentId = user.userId; // ได้จาก token ที่ login ไว้
+    final url = Uri.parse('$API_BASE_URL/classes/$classId/students/$studentId');
+
+    final res = await http.delete(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (res.statusCode == 204) {
+      // success
+      return;
+    } else {
+      try {
+        final data = json.decode(res.body);
+        final detail = data['detail'] ?? 'ไม่สามารถออกจากคลาสได้';
+        throw Exception(detail);
+      } catch (_) {
+        throw Exception('ออกจากคลาสไม่สำเร็จ (status: ${res.statusCode})');
+      }
+    }
+  }
 }
 
 

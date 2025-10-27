@@ -11,16 +11,15 @@ import 'screens/reset_password_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/camera_screen.dart';
 
-List<CameraDescription> _cameras = const [];
+List<CameraDescription> cameras = const [];
 
 Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    _cameras = await availableCameras();
+    cameras = await availableCameras();
   } on CameraException catch (e) {
-    // แค่ log ไว้ แล้วให้ fallback ตอนสร้าง route
     debugPrint('Camera init error: ${e.code} - ${e.description}');
-    _cameras = const [];
+    cameras = const [];
   }
 }
 
@@ -35,12 +34,12 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key, required this.initialRoute});
 
   CameraDescription? _pickFrontOrAny() {
-    if (_cameras.isEmpty) return null;
+    if (cameras.isEmpty) return null;
     // พยายามเอากล้องหน้า ถ้าไม่มี เอาตัวแรก
-    final front = _cameras.where(
+    final front = cameras.where(
       (c) => c.lensDirection == CameraLensDirection.front,
     );
-    return front.isNotEmpty ? front.first : _cameras.first;
+    return front.isNotEmpty ? front.first : cameras.first;
   }
 
   Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
