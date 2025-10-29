@@ -112,7 +112,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                   style: const TextStyle(fontSize: 24, color: Colors.white),
                 ),
               ),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.blueAccent, Colors.lightBlue],
                   begin: Alignment.topLeft,
@@ -126,9 +126,15 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               child: ListView(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.class_),
-                    title: Text(_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน'),
-                    onTap: () => Navigator.pop(context),
+                    leading: Icon(
+                      Icons.class_, 
+                      color: Colors.blueAccent
+                      ),
+                    title: Text(
+                      _isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน',
+                    ),   
+                    onTap: () => Navigator.pop(context)
+                    
                   ),
                   ListTile(
                     leading: const Icon(Icons.calendar_today),
@@ -183,7 +189,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                         final confirmed = await showDialog<bool>(
                           context: context,
 
-                          builder: (ctx) { //แบบ responsive เเล้ว
+                          builder: (ctx) {
+                            //แบบ responsive เเล้ว
                             // ดึงขนาดหน้าจอ
                             final screenWidth = MediaQuery.of(ctx).size.width;
 
@@ -244,7 +251,9 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                               actions: [
                                 TextButton(
                                   style: ButtonStyle(
-                                    overlayColor: MaterialStateProperty.all(Colors.transparent),
+                                    overlayColor: MaterialStateProperty.all(
+                                      Colors.transparent,
+                                    ),
                                   ),
                                   onPressed: () => Navigator.pop(ctx, false),
                                   child: Text(
@@ -311,7 +320,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                 onTap: () async {
                   final confirmed = await showDialog<bool>(
                     context: context,
-                    builder: (ctx) => AlertDialog( 
+                    builder: (ctx) => AlertDialog(
                       title: const Text('ยืนยันการออกจากระบบ'),
                       content: const Text('คุณต้องการออกจากระบบหรือไม่?'),
                       actions: [
@@ -353,7 +362,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _isTeacher ? _openCreate : _openJoin,
         tooltip: _isTeacher ? 'สร้างคลาสใหม่' : 'เข้าร่วมคลาส',
-        child: const Icon(Icons.add),
+        backgroundColor: Colors.blueAccent,
+        child: const Icon(Icons.add, color: Colors.white,),
       ),
       body: me == null
           ? const Center(child: CircularProgressIndicator())
