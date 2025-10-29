@@ -9,7 +9,7 @@ import io # เพิ่ม import io
 from io import BytesIO
 from PIL import UnidentifiedImageError
 from PIL import Image as PilImage, UnidentifiedImageError
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File , Path
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -223,3 +223,57 @@ async def delete_face_sample(
     status_code=status.HTTP_200_OK,
     content={"message": "Face sample deleted successfully."}
 )
+    
+@router.delete("/delete-face", status_code=status.HTTP_200_OK)
+async def delete_face(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    ลบข้อมูลใบหน้าทั้งหมดของผู้ใช้ปัจจุบัน
+    """
+    from app.models.user_face_sample import UserFaceSample
+
+    samples = db.query(UserFaceSample).filter(
+        UserFaceSample.user_id == current_user.user_id
+    ).all()
+
+    if not samples:
+        raise HTTPException(status_code=404, detail="ไม่พบข้อมูลใบหน้าในระบบ")
+
+    for s in samples:
+        file_path_on_disk = os.path.join(os.getcwd(), s.image_url.strip('/'))
+        if os.path.exists(file_path_on_disk):
+            os.remove(file_path_on_disk)
+        db.delete(s)
+
+    db.commit()
+    return {"message": "ลบข้อมูลใบหน้าทั้งหมดสำเร็จ"}
+    
+@router.get("/check-face/{user_id}")
+async def check_face_registered(
+    user_id: str = Path(..., description="User ID ของนักเรียน"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    ตรวจว่าผู้ใช้มีใบหน้าในระบบหรือยัง (ใช้ตอน login นักเรียน)
+    """
+    # ตรวจสิทธิ์: อาจารย์ดูได้ทุกคน, นักเรียนดูได้เฉพาะตัวเอง
+    if "student" in [r.name for r in current_user.roles]:
+        if str(current_user.user_id) != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Students can only check their own face status.",
+            )
+
+    face_record = (
+        db.query(UserFaceSample)
+        .filter(UserFaceSample.user_id == user_id)
+        .first()
+    )
+
+    return {
+        "user_id": user_id,
+        "has_face": face_record is not None
+    }

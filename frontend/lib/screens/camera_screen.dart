@@ -3,14 +3,14 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import '../utils/image_utils.dart'; //  ใช้ยูทิลหมุน/ย่อภาพก่อนอัปโหลด
+import '../utils/image_utils.dart';
 import '../services/face_service.dart';
-import '../services/face_service.dart'
-    show ApiException; 
+import '../services/face_service.dart' show ApiException;
+import 'classroom_home_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
-  final bool isVerificationMode;
+  final bool isVerificationMode; // true = verify-face, false = upload-face
 
   const CameraScreen({
     super.key,
@@ -28,6 +28,9 @@ class _CameraScreenState extends State<CameraScreen>
   late Future<void> _initializeControllerFuture;
   bool _isProcessing = false;
   bool _isCapturing = false;
+
+  bool _consentGiven = false;
+  bool _askedConsent = false;
 
   @override
   void initState() {
@@ -61,11 +64,10 @@ class _CameraScreenState extends State<CameraScreen>
 
   void _disposeController() {
     final c = _controller;
-    _controller = null; //  เคลียร์อ้างอิงเสมอ
+    _controller = null;
     c?.dispose();
   }
 
-  /// จัดการ lifecycle: แอปพัก/กลับมาใหม่ ให้ reinitialize กล้อง
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final controller = _controller;
@@ -77,7 +79,7 @@ class _CameraScreenState extends State<CameraScreen>
         controller.stopImageStream().catchError((_) {});
       }
       controller.dispose();
-      _controller = null; //  กันใช้ instance ที่ถูก dispose ไปแล้ว
+      _controller = null;
     } else if (state == AppLifecycleState.resumed) {
       _controller = CameraController(
         widget.camera,
@@ -99,71 +101,113 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+  Future<void> _askForConsent() async {
+    if (_askedConsent) return;
+    _askedConsent = true;
+
+    // โหมด verify ไม่ต้องถาม consent
+    if (widget.isVerificationMode) {
+      setState(() => _consentGiven = true);
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('ขออนุญาตเก็บข้อมูลใบหน้า'),
+        content: const Text(
+          'ระบบจะเก็บข้อมูลใบหน้าของคุณเพื่อใช้ในการยืนยันตัวตนในการเช็คชื่อในอนาคต '
+          'คุณยินยอมให้ระบบบันทึกข้อมูลนี้หรือไม่?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ไม่ยินยอม'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ยินยอม'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      setState(() => _consentGiven = true);
+    } else {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
+        );
+      }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    Future.microtask(() => _askForConsent());
+  }
+
+  void _popVerifyResult(dynamic result) {
+    if (mounted) {
+      Navigator.of(context).pop(result);
+    }
+  }
+
   Future<void> _captureAndProcess() async {
+    if (!_consentGiven && !widget.isVerificationMode) return;
+
     final controller = _controller;
-    if (_isProcessing || _isCapturing) return; // กันกดรัว
+    if (_isProcessing || _isCapturing) return;
     if (controller == null || !controller.value.isInitialized) return;
 
     try {
-      setState(() {
-        _isCapturing = true;
-      });
-
+      setState(() => _isCapturing = true);
       await _initializeControllerFuture;
 
-      // 1) ถ่ายรูปดิบจากกล้อง
       final XFile file = await controller.takePicture();
-
-      // Debug ขนาดไฟล์จากกล้อง
-      final rawBytes = await File(file.path).length();
-      // ignore: avoid_print
-      print("📸 Captured file: ${file.path} ($rawBytes bytes)");
-
-      // 2) หมุนตาม EXIF + ย่อ + บีบอัดก่อนส่ง (ตัวเลือก A: image)
       final normalizedPath = await normalizeAndSaveJpeg(
         file.path,
         maxWidth: 1600,
         jpegQuality: 92,
       );
 
-      final normBytes = await File(normalizedPath).length();
-      // ignore: avoid_print
-      print(" Normalized file: $normalizedPath ($normBytes bytes)");
+      setState(() => _isProcessing = true);
 
-      // 3) (ออปชัน) พรีวิวไฟล์ที่ normalize แล้ว
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          content: Image.file(File(normalizedPath), cacheWidth: 1080),
-        ),
-      );
-      if (!mounted) return;
-
-      setState(() {
-        _isProcessing = true;
-      });
-
-      // 4) อัปโหลด/ยืนยันโดยใช้ไฟล์ที่ normalize แล้ว
       if (widget.isVerificationMode) {
+        // โหมดยืนยันใบหน้า: เรียก /verify-face ที่ FaceService แล้ว pop ค่ากลับ
         final success = await FaceService.verifyFace(normalizedPath);
         if (!mounted) return;
-        _showResultDialog(
-          success ? 'ยืนยันตัวตนสำเร็จ' : 'ไม่พบใบหน้าที่ตรงกัน',
-          success ? Colors.green : Colors.red,
-        );
+
+        if (success) {
+          _popVerifyResult({'verified': true, 'imagePath': normalizedPath});
+        } else {
+          _popVerifyResult({'verified': false});
+        }
       } else {
-        final resp = await FaceService.uploadFace(normalizedPath);
-        // ignore: avoid_print
-        print(" Upload response: $resp");
+        //  โหมดลงทะเบียนใบหน้า: ทำงานเดิม (อัปโหลด + dialog)
+        await FaceService.uploadFace(normalizedPath);
         if (!mounted) return;
         _showResultDialog('อัปโหลดใบหน้าสำเร็จ', Colors.green);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showResultDialog(e.message, Colors.red); //  โชว์ข้อความจาก backend
+      if (widget.isVerificationMode) {
+        _popVerifyResult({'verified': false, 'error': e.message});
+      } else {
+        _showResultDialog(e.message, Colors.red);
+      }
     } catch (e) {
       if (!mounted) return;
-      _showResultDialog('เกิดข้อผิดพลาด: $e', Colors.red);
+      if (widget.isVerificationMode) {
+        _popVerifyResult({'verified': false, 'error': e.toString()});
+      } else {
+        _showResultDialog('เกิดข้อผิดพลาด: $e', Colors.red);
+      }
     } finally {
       if (!mounted) return;
       setState(() {
@@ -174,6 +218,7 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   void _showResultDialog(String message, Color color) {
+    // ใช้เฉพาะโหมด upload-face เพื่อกลับหน้า home
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -181,8 +226,11 @@ class _CameraScreenState extends State<CameraScreen>
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // ปิด dialog
-              Navigator.of(context).maybePop(); // กลับหน้าก่อนหน้า (ถ้าต้องการ)
+              Navigator.of(context).pop();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
+              );
             },
             child: const Text('OK'),
           ),
@@ -212,28 +260,86 @@ class _CameraScreenState extends State<CameraScreen>
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                //  เต็มจอแบบครอป (cover)
-                return SizedBox.expand(
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      // previewSize ของกล้องส่วนใหญ่เป็น landscape
-                      // พอถือมือถือแนวตั้ง ให้ "สลับ" width/height
-                      width: controller.value.previewSize!.height,
-                      height: controller.value.previewSize!.width,
-                      child: CameraPreview(controller),
+                if (!_consentGiven && !widget.isVerificationMode) {
+                  return const Center(
+                    child: Text(
+                      'กรุณายืนยันการเก็บข้อมูลใบหน้าก่อนเริ่มการถ่ายภาพ...',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16),
                     ),
-                  ),
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    // กล้องเต็มจอ
+                    SizedBox.expand(
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: controller.value.previewSize!.height,
+                          height: controller.value.previewSize!.width,
+                          child: CameraPreview(controller),
+                        ),
+                      ),
+                    ),
+
+                    // ปุ่มข้าม (เฉพาะอำนวยความสะดวก)
+                    if (!widget.isVerificationMode)
+                      Positioned(
+                        top: 40,
+                        right: 16,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black54,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ClassroomHomeScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'ข้าม',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // ปุ่มถ่ายภาพ
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 32),
+                        child: FloatingActionButton(
+                          onPressed: (_isProcessing || _isCapturing)
+                              ? null
+                              : _captureAndProcess,
+                          child: _isProcessing
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                              : const Icon(Icons.camera_alt),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: (_isProcessing || _isCapturing) ? null : _captureAndProcess,
-        child: _isProcessing
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Icon(Icons.camera_alt),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

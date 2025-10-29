@@ -52,7 +52,7 @@ def is_within_proximity(
     student_lon: float,
     teacher_lat: float,
     teacher_lon: float,
-    threshold: float = PROXIMITY_THRESHOLD
+    threshold: float | None = None
 ) -> bool:
     """
     ตรวจว่านักเรียนอยู่ในรัศมีที่กำหนดจากครูหรือไม่
@@ -60,7 +60,8 @@ def is_within_proximity(
     _validate_coords(student_lat, student_lon)
     _validate_coords(teacher_lat, teacher_lon)
     dist = calculate_distance((student_lat, student_lon), (teacher_lat, teacher_lon))
-    return dist <= float(threshold)
+    limit = float(threshold) if threshold is not None else float(PROXIMITY_THRESHOLD)
+    return dist <= limit
 
 
 # -----------------------------

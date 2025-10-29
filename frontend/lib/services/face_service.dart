@@ -161,4 +161,58 @@ class FaceService {
       throw ApiException('รูปแบบข้อมูลตอบกลับไม่ถูกต้อง.');
     }
   }
+
+   // 3 ตรวจว่านักเรียนมีใบหน้าในระบบแล้วหรือไม่
+  static Future<bool> checkHasFace(String userId) async {
+    try {
+      final token = await AuthService.getAccessToken();
+      final url = Uri.parse(
+        '$API_BASE_URL/face-recognition/check-face/$userId',
+      );
+      final res = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return data['has_face'] == true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
+  }
+
+ static Future<void> deleteFace() async {
+    try {
+      // ดึง token จาก AuthService
+      final token = await AuthService.getAccessToken();
+      if (token == null) {
+        throw Exception('ไม่พบโทเคน โปรดเข้าสู่ระบบใหม่');
+      }
+
+      // สร้าง URL และ Header
+      final url = Uri.parse('$API_BASE_URL/face-recognition/delete-face');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      // ส่งคำขอ DELETE
+      final response = await http.delete(url, headers: headers);
+
+      if (response.statusCode != 200) {
+        throw Exception('ลบใบหน้าไม่สำเร็จ: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('เกิดข้อผิดพลาดในการลบใบหน้า: $e');
+    }
+  }
 }
+
+
