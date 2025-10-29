@@ -1,6 +1,5 @@
 // lib/screens/camera_screen.dart
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../utils/image_utils.dart';
@@ -114,24 +113,105 @@ class _CameraScreenState extends State<CameraScreen>
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('ขออนุญาตเก็บข้อมูลใบหน้า'),
-        content: const Text(
-          'ระบบจะเก็บข้อมูลใบหน้าของคุณเพื่อใช้ในการยืนยันตัวตนในการเช็คชื่อในอนาคต '
-          'คุณยินยอมให้ระบบบันทึกข้อมูลนี้หรือไม่?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ไม่ยินยอม'),
+
+      builder: (_) { // แบบ responsive เเล้ว
+        // ขนาดหน้าจอ
+        final screenWidth = MediaQuery.of(context).size.width;
+
+        // ปรับขนาดตัวอักษรตามหน้าจอ
+        double titleFontSize =
+            screenWidth * 0.045; // ประมาณ 4.5% ของความกว้างหน้าจอ
+        double contentFontSize = screenWidth * 0.04; // ประมาณ 4%
+        double buttonFontSize = screenWidth * 0.04;
+
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('ยินยอม'),
+          title: Text(
+            'ขออนุญาตเก็บข้อมูลใบหน้า',
+            style: TextStyle(
+              fontSize: titleFontSize,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ],
-      ),
+          content: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: contentFontSize,
+                color: Colors.black87,
+              ),
+              children: const [
+                TextSpan(
+                  text:
+                      'ระบบจะเก็บข้อมูลใบหน้าของคุณเพื่อใช้ในการยืนยันตัวตน\n',
+                ),
+                TextSpan(text: 'ในการเช็คชื่อในอนาคต\n\n'),
+                TextSpan(text: 'คุณ '),
+                TextSpan(
+                  text: 'ยินยอม',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                TextSpan(text: ' ให้ระบบบันทึกข้อมูลนี้หรือไม่?'),
+              ],
+            ),
+            textAlign: TextAlign.start,
+          ),
+          actions: [
+            TextButton(
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all<Color>(
+                  Colors.grey[300]!,
+                ),
+                padding: MaterialStateProperty.all<EdgeInsets>(
+                  EdgeInsets.symmetric(
+                    horizontal: screenWidth * 0.05,
+                    vertical: screenWidth * 0.025,
+                  ),
+                ),
+                shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'ไม่ยินยอม',
+                style: TextStyle(fontSize: buttonFontSize, color: Colors.white),
+              ),
+            ),
+            FilledButton(
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all<Color>(
+                  Colors.blueAccent,
+                ),
+                padding: MaterialStateProperty.all<EdgeInsets>(
+                  EdgeInsets.symmetric(
+                    horizontal: screenWidth * 0.05,
+                    vertical: screenWidth * 0.025,
+                  ),
+                ),
+                shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'ยินยอม',
+                style: TextStyle(fontSize: buttonFontSize, color: Colors.white),
+              ),
+            ),
+          ],
+          // กำหนดความกว้างของ Dialog แบบ responsive
+          insetPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
+        );
+      },
     );
 
     if (result == true) {
@@ -250,6 +330,16 @@ class _CameraScreenState extends State<CameraScreen>
               ? 'ยืนยันตัวตนด้วยใบหน้า'
               : 'เพิ่มรูปภาพใบหน้า',
         ),
+        // iconTheme: const IconThemeData(color: Colors.black),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
+            );
+          },
+        ),
       ),
       body: controller == null
           ? const Center(child: CircularProgressIndicator())
@@ -325,6 +415,7 @@ class _CameraScreenState extends State<CameraScreen>
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 32),
                         child: FloatingActionButton(
+                          backgroundColor: Colors.blueAccent, 
                           onPressed: (_isProcessing || _isCapturing)
                               ? null
                               : _captureAndProcess,
@@ -332,7 +423,10 @@ class _CameraScreenState extends State<CameraScreen>
                               ? const CircularProgressIndicator(
                                   color: Colors.white,
                                 )
-                              : const Icon(Icons.camera_alt),
+                              : const Icon(
+                                Icons.camera_alt, 
+                                color: Colors.black54,
+                                ),
                         ),
                       ),
                     ),
