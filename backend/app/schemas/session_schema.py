@@ -1,5 +1,5 @@
 # backend/app/schemas/session_schema.py
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, conint, validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -13,6 +13,7 @@ class SessionOpenRequest(BaseModel):
     class_id: UUID
     latitude: float
     longitude: float
+    radius_meters: conint(ge=10, le=2000) = Field(..., description="รัศมีเมตร")
     start_time: Optional[datetime] = None
     late_cutoff_time: Optional[datetime] = None   
     end_time: Optional[datetime] = None
@@ -38,6 +39,7 @@ class SessionResponse(BaseModel):
     start_time: datetime
     late_cutoff_time: datetime
     end_time: datetime
+    radius_meters: int
     anchor_lat: float
     anchor_lon: float
     

@@ -24,7 +24,7 @@ def _ensure_aware_utc(dt: datetime) -> datetime:
 def create_attendance_session(
     db: Session,
     teacher_id: uuid.UUID,
-    session_data,  # SessionOpenRequest
+    session_data: SessionOpenRequest
 ) -> AttendanceSession:
     # 1) ตรวจสอบว่า class มีจริง
     classroom = db.query(ClassModel).filter(ClassModel.class_id == session_data.class_id).first()
@@ -74,6 +74,7 @@ def create_attendance_session(
         start_time=start_time,
         end_time=end_time,
         late_cutoff_time=late_cutoff_time,  # ← อย่าลืมฟิลด์นี้ในโมเดล/ไมเกรชัน
+        radius_meters=int(session_data.radius_meters),
         anchor_lat=anchor_log.latitude,
         anchor_lon=anchor_log.longitude,
     )

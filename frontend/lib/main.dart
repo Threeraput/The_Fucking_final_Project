@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:frontend/screens/verify_face_route.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -110,8 +111,9 @@ class MyApp extends StatelessWidget {
       initialRoute: initialRoute,
       onGenerateRoute: _onGenerateRoute,
       // ใส่ routes คงเหลือที่ไม่ต้องการ args (ถ้าอยาก)
-      routes: const {
+      routes: {
         // สามารถปล่อยว่างได้เพราะเราใช้ onGenerateRoute แล้ว
+        '/verify-face': (context) => const VerifyFaceRoute(),
       },
     );
   }

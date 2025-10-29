@@ -81,9 +81,12 @@ def record_check_in(
     if now > _ensure_aware_utc(session.end_time):
         raise HTTPException(status_code=400, detail="Check-in window for this session has closed.")
 
-    # 2) ตรวจระยะ anchor point
+    # 2) ตรวจระยะ anchor point (ปรับเพิ่ม threshold จาก session.radius_meters)
     t_lat = float(session.anchor_lat); t_lon = float(session.anchor_lon)
-    if not is_within_proximity(student_lat, student_lon, t_lat, t_lon):
+    session_radius = getattr(session, "radius_meters", None)
+    radius = float(session_radius) if session_radius is not None else None
+
+    if not is_within_proximity(student_lat, student_lon, t_lat, t_lon, threshold=radius):
         raise HTTPException(status_code=403, detail="Location check failed. You are too far from the classroom teacher.")
 
     # 3) Face verification (เหมือนเดิม)

@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 import '../services/auth_service.dart';
 import '../models/attendance_session.dart';
 import '../models/attendance.dart';
@@ -56,8 +57,8 @@ static Future<AttendanceSession> openSession({
       'class_id': classId,
       'duration_minutes': expiresInMinutes,
       'radius_meters': radiusMeters.toDouble(),
-      'latitude': latitude, // 👈 ชื่อคีย์ตาม error
-      'longitude': longitude, // 👈 ชื่อคีย์ตาม error
+      'latitude': latitude, 
+      'longitude': longitude,
     };
 
     final res = await http.post(
@@ -117,34 +118,48 @@ static Future<AttendanceSession> openSession({
 
   /// นักเรียนเช็คชื่อด้วยใบหน้า + GPS (อ่านรูปจากไฟล์ path ตามที่หน้าจอคุณส่งมา)
   /// backend จะอ่าน student จาก token (จึงไม่ต้องส่ง studentId)
-  static Future<Attendance> checkIn({
+  static Future<void> checkIn({
     required String sessionId,
     required String imagePath,
     required double latitude,
     required double longitude,
   }) async {
+    final url = Uri.parse(
+      '$API_BASE_URL/attendance/check-in',
+    ); // ← ใช้ตาม backend ของคุณ
     final token = await AuthService.getAccessToken();
     if (token == null) throw Exception('Not authenticated');
-    final file = File(imagePath);
-    if (!await file.exists()) {
-      throw Exception('รูปภาพไม่พบ: $imagePath');
-    }
 
-    final url = Uri.parse('${API_BASE_URL}/attendance/check-in');
     final req = http.MultipartRequest('POST', url)
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['session_id'] = sessionId
+      // ส่งสองชื่อ field เผื่อ backend ใช้ชื่อใดชื่อหนึ่ง
       ..fields['latitude'] = latitude.toString()
       ..fields['longitude'] = longitude.toString()
-      ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+      ..fields['student_lat'] = latitude.toString()
+      ..fields['student_lon'] = longitude.toString();
 
-    final streamed = await req.send();
-    final res = await http.Response.fromStream(streamed);
+    //  เปลี่ยนชื่อพาร์ตไฟล์ให้เป็น 'file' (ตาม error)
+    final mime = lookupMimeType(imagePath) ?? 'image/jpeg';
+    final parts = mime.split('/');
+    final filePart = await http.MultipartFile.fromPath(
+      'file', // ← ต้องเป็น 'file'
+      imagePath,
+      contentType: MediaType(parts.first, parts.last),
+    );
+    req.files.add(filePart);
 
-    if (res.statusCode == 200 || res.statusCode == 201) {
-      return Attendance.fromJson(jsonDecode(res.body));
-    } else {
-      throw Exception('Check-in failed: ${res.body}');
+    final res = await req.send();
+    final body = await res.stream.bytesToString();
+
+    // debug ช่วยเวลาเจอ 4xx
+    // ignore: avoid_print
+    print('📤 POST $url -> ${res.statusCode}');
+    // ignore: avoid_print
+    print('↩️ $body');
+
+    if (res.statusCode != 200) {
+      throw Exception('Check-in failed: $body');
     }
   }
 

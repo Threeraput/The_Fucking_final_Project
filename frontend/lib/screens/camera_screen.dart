@@ -10,7 +10,7 @@ import 'classroom_home_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
-  final bool isVerificationMode;
+  final bool isVerificationMode; // true = verify-face, false = upload-face
 
   const CameraScreen({
     super.key,
@@ -105,7 +105,7 @@ class _CameraScreenState extends State<CameraScreen>
     if (_askedConsent) return;
     _askedConsent = true;
 
-    // 🔸 ถ้าเป็นโหมด verify ไม่ต้องถาม
+    // โหมด verify ไม่ต้องถาม consent
     if (widget.isVerificationMode) {
       setState(() => _consentGiven = true);
       return;
@@ -152,6 +152,12 @@ class _CameraScreenState extends State<CameraScreen>
     Future.microtask(() => _askForConsent());
   }
 
+  void _popVerifyResult(dynamic result) {
+    if (mounted) {
+      Navigator.of(context).pop(result);
+    }
+  }
+
   Future<void> _captureAndProcess() async {
     if (!_consentGiven && !widget.isVerificationMode) return;
 
@@ -173,23 +179,35 @@ class _CameraScreenState extends State<CameraScreen>
       setState(() => _isProcessing = true);
 
       if (widget.isVerificationMode) {
+        // โหมดยืนยันใบหน้า: เรียก /verify-face ที่ FaceService แล้ว pop ค่ากลับ
         final success = await FaceService.verifyFace(normalizedPath);
         if (!mounted) return;
-        _showResultDialog(
-          success ? 'ยืนยันตัวตนสำเร็จ' : 'ไม่พบใบหน้าที่ตรงกัน',
-          success ? Colors.green : Colors.red,
-        );
+
+        if (success) {
+          _popVerifyResult({'verified': true, 'imagePath': normalizedPath});
+        } else {
+          _popVerifyResult({'verified': false});
+        }
       } else {
-        final resp = await FaceService.uploadFace(normalizedPath);
+        //  โหมดลงทะเบียนใบหน้า: ทำงานเดิม (อัปโหลด + dialog)
+        await FaceService.uploadFace(normalizedPath);
         if (!mounted) return;
         _showResultDialog('อัปโหลดใบหน้าสำเร็จ', Colors.green);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showResultDialog(e.message, Colors.red);
+      if (widget.isVerificationMode) {
+        _popVerifyResult({'verified': false, 'error': e.message});
+      } else {
+        _showResultDialog(e.message, Colors.red);
+      }
     } catch (e) {
       if (!mounted) return;
-      _showResultDialog('เกิดข้อผิดพลาด: $e', Colors.red);
+      if (widget.isVerificationMode) {
+        _popVerifyResult({'verified': false, 'error': e.toString()});
+      } else {
+        _showResultDialog('เกิดข้อผิดพลาด: $e', Colors.red);
+      }
     } finally {
       if (!mounted) return;
       setState(() {
@@ -200,6 +218,7 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   void _showResultDialog(String message, Color color) {
+    // ใช้เฉพาะโหมด upload-face เพื่อกลับหน้า home
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -253,7 +272,7 @@ class _CameraScreenState extends State<CameraScreen>
 
                 return Stack(
                   children: [
-                    // 🔸 กล้องเต็มจอ
+                    // กล้องเต็มจอ
                     SizedBox.expand(
                       child: FittedBox(
                         fit: BoxFit.cover,
@@ -265,37 +284,42 @@ class _CameraScreenState extends State<CameraScreen>
                       ),
                     ),
 
-                    // 🔹 ปุ่ม Skip (มุมขวาบน)
-                    Positioned(
-                      top: 40,
-                      right: 16,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black54,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                    // ปุ่มข้าม (เฉพาะอำนวยความสะดวก)
+                    if (!widget.isVerificationMode)
+                      Positioned(
+                        top: 40,
+                        right: 16,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black54,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
-                        ),
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ClassroomHomeScreen()),
-                          );
-                        },
-                        child: const Text(
-                          'ข้าม',
-                          style: TextStyle(
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ClassroomHomeScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'ข้าม',
+                            style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
-                              fontWeight: FontWeight.bold),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
 
-                    // 🔸 ปุ่มถ่ายภาพ
+                    // ปุ่มถ่ายภาพ
                     Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
