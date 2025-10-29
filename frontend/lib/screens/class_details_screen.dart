@@ -96,25 +96,31 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('รายละเอียดคลาส'),
-        actions: [
-          if (_isTeacher)
-            IconButton(onPressed: _deleteClass, icon: const Icon(Icons.delete)),
-        ],
-      ),
-      body: FutureBuilder<Classroom>(
-        future: _future,
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            if (snap.hasError) {
-              return Center(child: Text('Error: ${snap.error}'));
-            }
-            return const Center(child: CircularProgressIndicator());
+
+    return FutureBuilder<Classroom>(
+      future: _future,
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          if (snap.hasError) {
+            return Center(child: Text('Error: ${snap.error}'));
           }
-          final c = snap.data!;
-          return RefreshIndicator(
+          return const Center(child: CircularProgressIndicator());
+        }
+        final c = snap.data!;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(c.name ?? 'รายละเอียดคลาส'),
+            actions: [
+              if (_isTeacher)
+                IconButton(
+                  onPressed: _deleteClass,
+                  icon: const Icon(Icons.delete),
+                ),
+            ],
+          ),
+
+          body: RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
               padding: EdgeInsets.zero,
@@ -227,9 +233,9 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
                 ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
