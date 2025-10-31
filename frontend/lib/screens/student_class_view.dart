@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
@@ -77,6 +78,7 @@ class _StudentClassViewState extends State<StudentClassView> {
   }
 }
 
+final color = getClassColor('Example Class'); // ตัวอย่างการใช้ฟังก์ชัน
 class _StudentStreamTab extends StatelessWidget {
   final String classId;
   final String className;
@@ -93,6 +95,7 @@ class _StudentStreamTab extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         Card(
+          color: getClassColor(className), // ใช้ฟังก์ชันใหม่
           elevation: 3,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -327,9 +330,20 @@ class _StudentActiveSessionsSectionState
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   leading: const Icon(Icons.access_time),
-                  title: const Text('Session กำลังเปิดอยู่'),
+                  title: const Text(
+                    style: TextStyle(fontSize: 16),
+                    'Session กำลังเปิดอยู่'
+                    ),
                   subtitle: Text(subtitle.isEmpty ? '-' : subtitle),
                   trailing: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      foregroundColor: Colors.white, 
+                      shadowColor: Colors.black26, // สีเงาของปุ่ม
+                      elevation: 3, // ความสูงของเงา
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                
+                    ),
                     onPressed: () async {
                       final ok = await Navigator.push(
                         context,

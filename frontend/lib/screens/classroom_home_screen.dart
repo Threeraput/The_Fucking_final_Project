@@ -312,41 +312,110 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
             const Divider(),
 
             // 🔹 ปุ่มออกจากระบบ
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('ออกจากระบบ'),
-                onTap: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('ยืนยันการออกจากระบบ'),
-                      content: const Text('คุณต้องการออกจากระบบหรือไม่?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('ยกเลิก'),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('ออกจากระบบ'),
-                        ),
-                      ],
-                    ),
-                  );
+           Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+  child: ListTile(
+    leading: const Icon(Icons.logout, color: Colors.redAccent),
+    title: const Text(
+      'ออกจากระบบ',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        color: Colors.black87,
+      ),
+    ),
+    onTap: () async {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 400;
 
-                  if (confirmed == true) {
-                    await AuthService.logout();
-                    if (context.mounted) {
-                      Navigator.of(
-                        context,
-                      ).pushNamedAndRemoveUntil('/login', (route) => false);
-                    }
-                  }
-                },
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'ยืนยันการออกจากระบบ',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              ),
+          ),
+          content: RichText(
+             textAlign: TextAlign.center,
+              text: TextSpan(
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.black87,
+                height: 1.5,
+          ),
+          children: const [
+                TextSpan(text: 'คุณแน่ใจหรือไม่ว่าต้องการ\n'),
+                TextSpan(
+                  text: 'ออกจากระบบ',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                 TextSpan(text: '?\nหากคุณดำเนินการ ต้อง'),
+                TextSpan(
+                  text: 'เข้าสู่ระบบ',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextSpan(text: ' อีกครั้งเพื่อใช้งานระบบต่อ'),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[700],
+                overlayColor: Colors.transparent, // ❌ ไม่มีสีตอนกด
+              ),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'ยกเลิก',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 14 : 15,
+                ),
               ),
             ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 16 : 20,
+                  vertical: 10,
+                ),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                'ออกจากระบบ',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 14 : 15,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await AuthService.logout();
+        if (context.mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        }
+      }
+    },
+  ),
+),
           ],
         ),
       ),
@@ -484,6 +553,28 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+Color getClassColor(String? className, {int shade = 400}) {
+  if (className == null || className.isEmpty) return Colors.grey.shade400;
+  final baseColor = Colors.primaries[className.hashCode % Colors.primaries.length];
+  
+  // shade ที่ต้องการ
+  switch (shade) {
+    case 100:
+      return baseColor.shade100;
+    case 200:
+      return baseColor.shade200;
+    case 300:
+      return baseColor.shade300;
+    case 400:
+      return baseColor.shade400;
+    case 500:
+      return baseColor.shade500;
+    default:
+      return baseColor.shade400;
+  }
+}
+
+
 class _ClassCard extends StatelessWidget {
   final Classroom c;
   final bool isTeacher;
@@ -492,12 +583,11 @@ class _ClassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Colors.primaries[c.name.hashCode % Colors.primaries.length];
-
+    final color = getClassColor(c.name);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 4,
-      color: color.shade400,
+      color: color,
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),

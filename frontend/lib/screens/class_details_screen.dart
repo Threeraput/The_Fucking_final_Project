@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
+import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_announcement_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
@@ -13,6 +14,7 @@ import 'package:intl/intl.dart';
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
   final String? className; // เผื่อส่งชื่อมาจาก Card
+  
 
   const ClassDetailsScreen({super.key, required this.classId, this.className});
 
@@ -127,12 +129,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           255,
           255,
         ), // 🔹 พื้นหลัง
-        selectedItemColor: const Color.fromARGB(
-          255,
-          65,
-          171,
-          179,
-        ), // 🔹 สีไอคอนและข้อความที่เลือก
+        selectedItemColor: Colors.blueAccent, // 🔹 สีไอคอนและข้อความที่เลือก
         unselectedItemColor: const Color.fromARGB(
           255,
           39,
@@ -185,6 +182,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   }
 }
 
+final color = getClassColor('Example Class'); // ตัวอย่างการใช้ฟังก์ชัน
 class _StreamTab extends StatelessWidget {
   final String classId; // ✅ เพิ่ม
   final Classroom? classroom;
@@ -197,6 +195,7 @@ class _StreamTab extends StatelessWidget {
     required this.isTeacher,
     required this.onCreateAnnouncement,
   });
+
 
   @override
   Widget build(BuildContext context) {
@@ -211,6 +210,7 @@ class _StreamTab extends StatelessWidget {
         children: [
           if (c != null)
             Card(
+              color: getClassColor(c.name ?? 'Class'), // ใช้ฟังก์ชันใหม่
               elevation: 3,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -432,6 +432,19 @@ class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
                     const SizedBox(width: 12),
                     const Expanded(child: Text('ยังไม่มีการเปิดเช็คชื่อ')),
                     FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blueAccent, // พื้นหลังปุ่ม
+                        foregroundColor: Colors.white, // สีของข้อความและไอคอน
+                        shadowColor: Colors.black26, // สีเงาของปุ่ม
+                        elevation: 3, // ความสูงของเงา
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                       onPressed: () async {
                         final opened = await showModalBottomSheet<bool>(
                           context: context,
@@ -504,10 +517,35 @@ class _ActiveSessionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: const Icon(Icons.access_time),
-        title: const Text('Session กำลังเปิดอยู่'),
-        subtitle: Text('$expTxt · รัศมี $radius m\nAnchor: $lat, $lon'),
+        title: const Text(
+          style: TextStyle(fontSize: 16),
+          'Session กำลังเปิดอยู่',
+        ),
+        subtitle: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('$expTxt · รัศมี $radius m'),
+        Text(
+          style: const TextStyle(fontSize: 10),
+          'Anchor: $lat, $lon'),
+      ],
+    ),
         trailing: isTeacher
             ? FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.blueAccent, // พื้นหลังปุ่ม
+                  foregroundColor: Colors.white, // สีของข้อความและไอคอน
+                  shadowColor: Colors.black26, // สีเงาของปุ่ม
+                  elevation: 3, // ความสูงของเงา
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: () async {
                   final opened = await showModalBottomSheet<bool>(
                     context: context,

@@ -177,6 +177,11 @@ class _StudentCheckinScreenState extends State<StudentCheckinScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(44),
+              ),
                     onPressed: _busy ? null : _checkIn,
                     icon: _busy
                         ? const SizedBox(
