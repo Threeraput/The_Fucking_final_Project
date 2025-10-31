@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/student_reverify_screen.dart';
+import 'package:frontend/utils/location_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
@@ -209,6 +211,8 @@ class _StudentActiveSessionsSectionState
     extends State<_StudentActiveSessionsSection> {
   late Future<List<Map<String, dynamic>>> _future;
   Timer? _timer;
+  String? sessionId;
+
 
   @override
   void initState() {
@@ -305,6 +309,8 @@ class _StudentActiveSessionsSectionState
             ),
             const SizedBox(height: 8),
             ...sessions.map((s) {
+              final sessionId = (s['session_id'] ?? s['id'] ?? s['sessionId'])
+                  ?.toString();
               // เวลา/รายละเอียด (กัน null)
               final expStr = s['expires_at']?.toString();
               DateTime? exp;
@@ -329,19 +335,94 @@ class _StudentActiveSessionsSectionState
                   leading: const Icon(Icons.access_time),
                   title: const Text('Session กำลังเปิดอยู่'),
                   subtitle: Text(subtitle.isEmpty ? '-' : subtitle),
-                  trailing: FilledButton(
-                    onPressed: () async {
-                      final ok = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              StudentCheckinScreen(classId: widget.classId),
-                        ),
-                      );
-                      if (ok == true) _refresh();
-                    },
-                    child: const Text('เช็คชื่อ'),
+                trailing: Wrap(
+                    spacing: 8,
+                    children: [
+                      // ปุ่มเช็คชื่อ (เดิม)
+                      FilledButton(
+                        onPressed: () async {
+                          final ok = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  StudentCheckinScreen(classId: widget.classId),
+                            ),
+                          );
+                          if (ok == true) _refresh();
+                        },
+                        child: const Text('เช็คชื่อ'),
+                      ),
+
+                      // 🔹 ปุ่มยืนยันซ้ำ (ใช้ VerifyFaceRoute)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.verified_user_outlined),
+                        label: const Text('ยืนยันซ้ำ'),
+                        onPressed: () async {
+                          final sessionId =
+                              (s['session_id'] ?? s['id'] ?? s['sessionId'])
+                                  ?.toString();
+                          if (sessionId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('ไม่พบ session_id')),
+                            );
+                            return;
+                          }
+
+                          try {
+                            //  1) เปิดหน้า VerifyFaceRoute ในโหมด reverify
+                            final result = await Navigator.pushNamed(
+                              context,
+                              '/reverify-face',
+                            );
+
+                            if (result == null ||
+                                result is! String ||
+                                result.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('ยกเลิกการยืนยันซ้ำ'),
+                                ),
+                              );
+                              return;
+                            }
+
+                            final imagePath = result;
+
+                            //  2) ดึงพิกัด GPS
+                            final pos =
+                                await LocationHelper.getCurrentPositionOrThrow();
+
+                            // 📡 3) ส่งข้อมูลไปยัง API /attendance/re-verify
+                            await AttendanceService.reVerify(
+                              sessionId: sessionId,
+                              imagePath: imagePath,
+                              latitude: pos.latitude,
+                              longitude: pos.longitude,
+                            );
+
+                            if (!context.mounted) return;
+                            // ✅ 4) แจ้งผลและรีเฟรช
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('ยืนยันตัวตนซ้ำสำเร็จ'),
+                              ),
+                            );
+                            _refresh();
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'เกิดข้อผิดพลาด: ${e.toString()}',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
                   ),
+                  
                 ),
               );
             }),

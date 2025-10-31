@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget {
 
   CameraDescription? _pickFrontOrAny() {
     if (cameras.isEmpty) return null;
-    // พยายามเอากล้องหน้า ถ้าไม่มี เอาตัวแรก
+    // พยายามเลือกกล้องหน้า ถ้าไม่มีใช้ตัวแรกแทน
     final front = cameras.where(
       (c) => c.lensDirection == CameraLensDirection.front,
     );
@@ -74,12 +74,13 @@ class MyApp extends StatelessWidget {
       case '/admin-dashboard':
         return MaterialPageRoute(builder: (_) => AdminDashboardScreen());
 
+      //  กล้องสำหรับอัปโหลด/ตรวจสอบใบหน้า
       case '/upload-face':
       case '/verify-face':
         {
           final cam = _pickFrontOrAny();
           if (cam == null) {
-            // กันกรณีไม่มีกล้อง/เปิดไม่ขึ้น
+            // กรณีไม่มีอุปกรณ์กล้อง
             return MaterialPageRoute(
               builder: (_) => Scaffold(
                 appBar: AppBar(title: const Text('Camera')),
@@ -110,10 +111,13 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(primarySwatch: Colors.blue),
       initialRoute: initialRoute,
       onGenerateRoute: _onGenerateRoute,
-      // ใส่ routes คงเหลือที่ไม่ต้องการ args (ถ้าอยาก)
       routes: {
-        // สามารถปล่อยว่างได้เพราะเราใช้ onGenerateRoute แล้ว
+        //  verify-face สำหรับตรวจยืนยัน
         '/verify-face': (context) => const VerifyFaceRoute(),
+
+        //  reverify-face สำหรับสุ่มตรวจซ้ำกลางคาบ
+        '/reverify-face': (context) =>
+            const VerifyFaceRoute(isReverifyMode: true),
       },
     );
   }

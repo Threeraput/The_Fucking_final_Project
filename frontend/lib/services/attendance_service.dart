@@ -163,7 +163,7 @@ static Future<AttendanceSession> openSession({
     }
   }
 
-  static Future<Attendance> reVerify({
+  static Future<void> reVerify({
     required String sessionId,
     required String imagePath,
     required double latitude,
@@ -171,26 +171,28 @@ static Future<AttendanceSession> openSession({
   }) async {
     final token = await AuthService.getAccessToken();
     if (token == null) throw Exception('Not authenticated');
-    final file = File(imagePath);
-    if (!await file.exists()) {
-      throw Exception('รูปภาพไม่พบ: $imagePath');
-    }
 
-    final url = Uri.parse('${API_BASE_URL}/attendance/re-verify');
-    final req = http.MultipartRequest('POST', url)
+    final uri = Uri.parse('$API_BASE_URL/attendance/re-verify');
+    final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['session_id'] = sessionId
       ..fields['latitude'] = latitude.toString()
-      ..fields['longitude'] = longitude.toString()
-      ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+      ..fields['longitude'] = longitude.toString();
 
-    final streamed = await req.send();
-    final res = await http.Response.fromStream(streamed);
+    final file = await http.MultipartFile.fromPath(
+      'file',
+      imagePath,
+      //filename: p.basename(imagePath),
+      contentType: MediaType(
+        'image',
+        'jpeg',
+      ), // import 'package:http_parser/http_parser.dart';
+    );
+    req.files.add(file);
 
-    if (res.statusCode == 200 || res.statusCode == 201) {
-      return Attendance.fromJson(jsonDecode(res.body));
-    } else {
-      throw Exception('Re-verify failed: ${res.body}');
+    final res = await http.Response.fromStream(await req.send());
+    if (res.statusCode != 200) {
+      throw Exception('Re-verify failed [${res.statusCode}]: ${res.body}');
     }
   }
 
@@ -221,4 +223,6 @@ static Future<AttendanceSession> openSession({
   }
 
   static Future fetchActiveSessions() async {}
+
+  
 }

@@ -11,11 +11,13 @@ import 'classroom_home_screen.dart';
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
   final bool isVerificationMode; // true = verify-face, false = upload-face
+  final void Function(String path)? onImageCaptured;
 
   const CameraScreen({
     super.key,
     required this.camera,
     this.isVerificationMode = false,
+    this.onImageCaptured,
   });
 
   @override
@@ -106,7 +108,7 @@ class _CameraScreenState extends State<CameraScreen>
     _askedConsent = true;
 
     // โหมด verify ไม่ต้องถาม consent
-    if (widget.isVerificationMode) {
+     if (widget.isVerificationMode || widget.onImageCaptured != null) {
       setState(() => _consentGiven = true);
       return;
     }
@@ -158,8 +160,12 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  Future<void> _captureAndProcess() async {
-    if (!_consentGiven && !widget.isVerificationMode) return;
+Future<void> _captureAndProcess() async {
+    // ต้องให้ consent ก่อน ยกเว้น verify-mode หรือ re-verify (มี onImageCaptured)
+    if (!_consentGiven &&
+        !widget.isVerificationMode &&
+        widget.onImageCaptured == null)
+      return;
 
     final controller = _controller;
     if (_isProcessing || _isCapturing) return;
@@ -178,8 +184,14 @@ class _CameraScreenState extends State<CameraScreen>
 
       setState(() => _isProcessing = true);
 
+      //  โหมด re-verify → คืน path กลับ (ไม่ upload/verify ในหน้านี้)
+      if (widget.onImageCaptured != null) {
+        widget.onImageCaptured!(normalizedPath);
+        return;
+      }
+
+      //  โหมด verify
       if (widget.isVerificationMode) {
-        // โหมดยืนยันใบหน้า: เรียก /verify-face ที่ FaceService แล้ว pop ค่ากลับ
         final success = await FaceService.verifyFace(normalizedPath);
         if (!mounted) return;
 
@@ -188,8 +200,9 @@ class _CameraScreenState extends State<CameraScreen>
         } else {
           _popVerifyResult({'verified': false});
         }
-      } else {
-        //  โหมดลงทะเบียนใบหน้า: ทำงานเดิม (อัปโหลด + dialog)
+      }
+      //  โหมด enroll (เพิ่มใบหน้า)
+      else {
         await FaceService.uploadFace(normalizedPath);
         if (!mounted) return;
         _showResultDialog('อัปโหลดใบหน้าสำเร็จ', Colors.green);
@@ -217,6 +230,7 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+
   void _showResultDialog(String message, Color color) {
     // ใช้เฉพาะโหมด upload-face เพื่อกลับหน้า home
     showDialog(
@@ -243,14 +257,14 @@ class _CameraScreenState extends State<CameraScreen>
   Widget build(BuildContext context) {
     final controller = _controller;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.isVerificationMode
+      final String appBarTitle = widget.onImageCaptured != null
+        ? 'ยืนยันตัวตนซ้ำ (Re-verify)'
+        : (widget.isVerificationMode
               ? 'ยืนยันตัวตนด้วยใบหน้า'
-              : 'เพิ่มรูปภาพใบหน้า',
-        ),
-      ),
+              : 'เพิ่มรูปภาพใบหน้า');
+
+    return Scaffold(
+      appBar: AppBar(title: Text(appBarTitle)),
       body: controller == null
           ? const Center(child: CircularProgressIndicator())
           : FutureBuilder<void>(

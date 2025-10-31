@@ -4,7 +4,9 @@ import 'package:camera/camera.dart';
 import 'camera_screen.dart';
 
 class VerifyFaceRoute extends StatefulWidget {
-  const VerifyFaceRoute({super.key});
+  /// true = ใช้สำหรับ re-verify (สุ่มตรวจซ้ำ) → ถ่ายแล้วคืนรูปให้หน้าเดิม
+  final bool isReverifyMode;
+  const VerifyFaceRoute({super.key, this.isReverifyMode = false});
 
   @override
   State<VerifyFaceRoute> createState() => _VerifyFaceRouteState();
@@ -27,7 +29,6 @@ class _VerifyFaceRouteState extends State<VerifyFaceRoute> {
         setState(() => _error = 'ไม่พบกล้องบนอุปกรณ์');
         return;
       }
-      // เลือกกล้องหน้าเป็นอันดับแรก ถ้ามี
       final front = cams.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cams.first,
@@ -49,6 +50,16 @@ class _VerifyFaceRouteState extends State<VerifyFaceRoute> {
     if (_camera == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return CameraScreen(camera: _camera!, isVerificationMode: true);
+
+    final isReverify = widget.isReverifyMode;
+
+    // re-verify: ไม่ทำ verify/enroll ในกล้อง แต่คืน path กลับ
+    return CameraScreen(
+      camera: _camera!,
+      isVerificationMode: !isReverify, // re-verify => false
+      onImageCaptured: isReverify
+          ? (String path) => Navigator.pop(context, path)
+          : null,
+    );
   }
 }

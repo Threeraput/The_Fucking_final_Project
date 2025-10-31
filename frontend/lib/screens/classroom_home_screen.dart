@@ -112,7 +112,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                   style: const TextStyle(fontSize: 24, color: Colors.white),
                 ),
               ),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.blueAccent, Colors.lightBlue],
                   begin: Alignment.topLeft,
@@ -126,7 +126,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               child: ListView(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.class_),
+                    leading: Icon(Icons.class_, color: Colors.blueAccent),
                     title: Text(_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน'),
                     onTap: () => Navigator.pop(context),
                   ),
@@ -171,10 +171,10 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                       leading: const Icon(Icons.face_retouching_natural),
                       title: const Text('เพิ่มใบหน้า'),
                       onTap: () async {
-                       Navigator.pushReplacementNamed(context, '/upload-face');
+                        Navigator.pushReplacementNamed(context, '/upload-face');
                       },
                     ),
-                   ListTile(
+                    ListTile(
                       leading: const Icon(Icons.delete_forever),
                       title: const Text('ลบใบหน้า'),
                       onTap: () async {
@@ -182,33 +182,102 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
 
                         final confirmed = await showDialog<bool>(
                           context: context,
-                          builder: (ctx) => AlertDialog(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            title: const Text(
-                              'ยืนยันการลบข้อมูลใบหน้า',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            content: const Text(
-                              'คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลใบหน้าของคุณออกจากระบบ?\n'
-                              'การกระทำนี้ไม่สามารถกู้คืนได้',
-                              style: TextStyle(fontSize: 15),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('ยกเลิก'),
+
+                          builder: (ctx) {
+                            //แบบ responsive เเล้ว
+                            // ดึงขนาดหน้าจอ
+                            final screenWidth = MediaQuery.of(ctx).size.width;
+
+                            // ปรับขนาดอักษรและระยะห่างตามขนาดหน้าจอ
+                            final titleFontSize = screenWidth * 0.045;
+                            final contentFontSize = screenWidth * 0.04;
+                            final buttonFontSize = screenWidth * 0.04;
+                            final paddingSize = screenWidth * 0.04;
+
+                            return AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              FilledButton(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Colors.redAccent,
+                              title: Text(
+                                'ยืนยันการลบข้อมูลใบหน้า',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: titleFontSize,
                                 ),
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('ลบ'),
+                                textAlign: TextAlign.center,
                               ),
-                            ],
-                          ),
+                              content: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: paddingSize * 0.5,
+                                ),
+                                child: RichText(
+                                  textAlign: TextAlign.center,
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontSize: contentFontSize,
+                                      height: 1.4,
+                                      color: Colors.black87,
+                                    ),
+                                    children: [
+                                      const TextSpan(
+                                        text:
+                                            'คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลใบหน้าของคุณออกจากระบบ?\n',
+                                      ),
+                                      TextSpan(
+                                        text: 'การกระทำนี้ ',
+                                        style: TextStyle(color: Colors.black87),
+                                      ),
+                                      TextSpan(
+                                        text: 'ไม่สามารถกู้คืนได้',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              actionsAlignment: MainAxisAlignment.spaceEvenly,
+                              actionsPadding: EdgeInsets.only(
+                                bottom: paddingSize * 0.5,
+                              ),
+                              actions: [
+                                TextButton(
+                                  style: ButtonStyle(
+                                    overlayColor: MaterialStateProperty.all(
+                                      Colors.transparent,
+                                    ),
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: Text(
+                                    'ยกเลิก',
+                                    style: TextStyle(
+                                      fontSize: buttonFontSize,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.redAccent,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth * 0.06,
+                                      vertical: screenWidth * 0.025,
+                                    ),
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: Text(
+                                    'ลบ',
+                                    style: TextStyle(
+                                      fontSize: buttonFontSize,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         );
 
                         if (confirmed == true) {
@@ -278,7 +347,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final me = _me;
@@ -288,7 +356,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _isTeacher ? _openCreate : _openJoin,
         tooltip: _isTeacher ? 'สร้างคลาสใหม่' : 'เข้าร่วมคลาส',
-        child: const Icon(Icons.add),
+        backgroundColor: Colors.blueAccent,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: me == null
           ? const Center(child: CircularProgressIndicator())
@@ -333,7 +402,8 @@ class _TeacherClasses extends StatelessWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: data.length,
-            itemBuilder: (_, i) => _ClassCard(c: data[i], isTeacher: true  , onRefresh: onRefresh),
+            itemBuilder: (_, i) =>
+                _ClassCard(c: data[i], isTeacher: true, onRefresh: onRefresh),
           ),
         );
       },
@@ -369,7 +439,8 @@ class _StudentClasses extends StatelessWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: data.length,
-            itemBuilder: (_, i) => _ClassCard(c: data[i], isTeacher: false , onRefresh: onRefresh),
+            itemBuilder: (_, i) =>
+                _ClassCard(c: data[i], isTeacher: false, onRefresh: onRefresh),
           ),
         );
       },
@@ -580,4 +651,3 @@ class _ClassCard extends StatelessWidget {
     );
   }
 }
-

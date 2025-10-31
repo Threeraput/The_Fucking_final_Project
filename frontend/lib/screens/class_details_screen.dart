@@ -9,6 +9,10 @@ import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/teacher_open_checkin_sheet.dart';
 import 'package:frontend/screens/student_checkin_screen.dart'; //  เพิ่ม
 import 'package:intl/intl.dart';
+import 'package:frontend/services/feed_service.dart';
+import 'package:frontend/widgets/feed_cards.dart';
+import 'package:frontend/models/feed_item.dart';
+
 
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
@@ -185,8 +189,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   }
 }
 
-class _StreamTab extends StatelessWidget {
-  final String classId; // ✅ เพิ่ม
+class _StreamTab extends StatefulWidget {
+  final String classId;
   final Classroom? classroom;
   final bool isTeacher;
   final VoidCallback onCreateAnnouncement;
@@ -199,13 +203,29 @@ class _StreamTab extends StatelessWidget {
   });
 
   @override
+  State<_StreamTab> createState() => _StreamTabState();
+}
+
+class _StreamTabState extends State<_StreamTab> {
+  late Future<List<FeedItem>> _futureFeed;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureFeed = FeedService.getClassFeed(widget.classId);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _futureFeed = FeedService.getClassFeed(widget.classId);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final c = classroom;
+    final c = widget.classroom;
     return RefreshIndicator(
-      onRefresh: () async {
-        // ไว้รีเฟรชประกาศ เมื่อมี service ประกาศ
-        await Future.delayed(const Duration(milliseconds: 400));
-      },
+      onRefresh: _refresh,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -239,36 +259,62 @@ class _StreamTab extends StatelessWidget {
               ),
             ),
 
-          // ✅ แสดง Active Sessions ของคลาสนี้ (ครู: เปิดใหม่, นร.: เช็คชื่อ)
-          const SizedBox(height: 12),
-          _ActiveSessionsSection(classId: classId, isTeacher: isTeacher),
-
-          if (isTeacher) ...[
+          // ปุ่มสร้างประกาศ (ครู)
+          if (widget.isTeacher) ...[
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed: onCreateAnnouncement,
+              onPressed: widget.onCreateAnnouncement,
               icon: const Icon(Icons.campaign),
               label: const Text('Create Announcement'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(44),
               ),
             ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () async {
+                final opened = await showModalBottomSheet<bool>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) =>
+                      TeacherOpenCheckinSheet(classId: widget.classId),
+                );
+                if (opened == true) _refresh();
+              },
+              icon: const Icon(Icons.play_circle_outline),
+              label: const Text('ประกาศเช็คชื่อ'),
+            ),
           ],
+
           const SizedBox(height: 16),
           Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          // TODO: แสดงรายการประกาศจริงเมื่อมี service
-          Card(
-            margin: const EdgeInsets.only(top: 8),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'No announcements yet.',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+
+          // ✅ ฟีดการ์ดแบบ Google Classroom
+          FutureBuilder<List<FeedItem>>(
+            future: _futureFeed,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snap.hasError) {
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('โหลดฟีดไม่สำเร็จ: ${snap.error}'),
+                  ),
+                );
+              }
+              final feed = snap.data ?? const <FeedItem>[];
+              return FeedList(
+                items: feed,
+                isTeacher: widget.isTeacher,
+                classId: widget.classId,
+              );
+            },
           ),
         ],
       ),
@@ -355,182 +401,6 @@ class _PeopleTab extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// ======================
-/// Active Sessions Section
-/// ======================
-class _ActiveSessionsSection extends StatefulWidget {
-  final String classId;
-  final bool isTeacher;
-  const _ActiveSessionsSection({
-    required this.classId,
-    required this.isTeacher,
-  });
-
-  @override
-  State<_ActiveSessionsSection> createState() => _ActiveSessionsSectionState();
-}
-
-class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
-  late Future<List<Map<String, dynamic>>> _futureSessions;
-
-  @override
-  void initState() {
-    super.initState();
-    _futureSessions = _loadSessions();
-  }
-
-  Future<List<Map<String, dynamic>>> _loadSessions() async {
-    final all = await AttendanceService.getActiveSessions();
-    return all
-        .where((m) => (m['class_id']?.toString() ?? '') == widget.classId)
-        .toList();
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _futureSessions = _loadSessions();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _futureSessions,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'ไม่สามารถโหลด Session ได้: ${snapshot.error}',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          );
-        }
-
-        final sessions = snapshot.data ?? [];
-        if (sessions.isEmpty) {
-          if (widget.isTeacher) {
-            return Card(
-              color: Theme.of(context).colorScheme.surfaceVariant,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Text('ยังไม่มีการเปิดเช็คชื่อ')),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        final opened = await showModalBottomSheet<bool>(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (_) =>
-                              TeacherOpenCheckinSheet(classId: widget.classId),
-                        );
-                        if (opened == true) _refresh();
-                      },
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('เปิดเช็คชื่อ'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          return const SizedBox.shrink();
-        }
-
-        // มี session -> แสดงการ์ดทั้งหมด
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'เช็คชื่อที่กำลังเปิดอยู่',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            ...sessions.map(
-              (s) => _ActiveSessionCard(
-                data: s,
-                isTeacher: widget.isTeacher,
-                classId: widget.classId,
-                onRefetch: _refresh,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ActiveSessionCard extends StatelessWidget {
-  final Map<String, dynamic> data;
-  final bool isTeacher;
-  final String classId;
-  final Future<void> Function() onRefetch;
-
-  const _ActiveSessionCard({
-    required this.data,
-    required this.isTeacher,
-    required this.classId,
-    required this.onRefetch,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat('HH:mm');
-    final expiresAt = DateTime.tryParse(data['expires_at']?.toString() ?? '');
-    final expTxt = expiresAt != null
-        ? 'หมดอายุ ${df.format(expiresAt.toLocal())}'
-        : 'ไม่ทราบเวลา';
-    final radius = data['radius_meters']?.toString() ?? '-';
-    final lat = data['anchor_lat']?.toString() ?? '-';
-    final lon = data['anchor_lon']?.toString() ?? '-';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const Icon(Icons.access_time),
-        title: const Text('Session กำลังเปิดอยู่'),
-        subtitle: Text('$expTxt · รัศมี $radius m\nAnchor: $lat, $lon'),
-        trailing: isTeacher
-            ? FilledButton(
-                onPressed: () async {
-                  final opened = await showModalBottomSheet<bool>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => TeacherOpenCheckinSheet(classId: classId),
-                  );
-                  if (opened == true) onRefetch();
-                },
-                child: const Text('เปิดใหม่'),
-              )
-            : FilledButton(
-                onPressed: () async {
-                  final ok = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => StudentCheckinScreen(classId: classId),
-                    ),
-                  );
-                  if (ok == true) onRefetch();
-                },
-                child: const Text('เช็คชื่อ'),
-              ),
-      ),
     );
   }
 }

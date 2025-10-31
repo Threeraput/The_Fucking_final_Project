@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/services/class_service.dart';
+import 'package:flutter/services.dart';
 
 class JoinClassSheet extends StatefulWidget {
   const JoinClassSheet({super.key});
 
   @override
   State<JoinClassSheet> createState() => _JoinClassSheetState();
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
 }
 
 class _JoinClassSheetState extends State<JoinClassSheet> {
@@ -85,18 +99,55 @@ class _JoinClassSheetState extends State<JoinClassSheet> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _codeCtl,
-            decoration: InputDecoration(
-              labelText: 'รหัสคลาส',
-              border: const OutlineInputBorder(),
-              errorText: _errorText, // ✅ แสดง error ใต้กล่อง
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _codeCtl,
+                decoration: InputDecoration(
+                  labelText: 'รหัสคลาส',
+                  border: const OutlineInputBorder(),
+                  errorText: _errorText,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'[a-zA-Z0-9]'),
+                  ), // เฉพาะตัวเลขและอังกฤษ
+                  UpperCaseTextFormatter(), // แปลงเป็นพิมพ์ใหญ่
+                ],
+              ),
+              const SizedBox(height: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    '• รหัสต้องเป็นตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• ห้ามใช้สัญลักษณ์พิเศษหรือเว้นวรรค',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• ตัวอักษรทั้งหมดต้องเป็นตัวพิมพ์ใหญ่',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• ห้ามใช้ตัวอักษรภาษาไทยหรือภาษาต่างประเทศอื่น ๆ',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: Colors.blueAccent),
               icon: _loading
                   ? const SizedBox(
                       width: 18,
