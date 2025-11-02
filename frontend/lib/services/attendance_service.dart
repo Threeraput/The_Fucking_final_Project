@@ -42,23 +42,48 @@ class AttendanceService {
   /// (ฝั่งครู) เปิด session เช็คชื่อ (ยังไม่ใส่ anchor ในขั้นนี้ตามโฟลว์ของคุณ)
 static Future<AttendanceSession> openSession({
     required String classId,
-    required int expiresInMinutes,
+    required int expiresInMinutes, // เช่น 60
     required int radiusMeters,
-    required double latitude, // 👈 เพิ่ม (บังคับ)
-    required double longitude, // 👈 เพิ่ม (บังคับ)
+    required double latitude,
+    required double longitude,
+    int lateCutoffMinutes = 10, // ปล่อยปรับได้ (ดีฟอลต์ 10)
   }) async {
     final token = await AuthService.getAccessToken();
     if (token == null) throw Exception('Not authenticated');
 
-    final url = Uri.parse('${API_BASE_URL}/sessions/open');
+    // --- คำนวณเวลาแบบ absolute (UTC) ---
+    final nowUtc = DateTime.now().toUtc();
+    // ถ้ากังวล millisecond ให้สร้างเป็น UTC แบบตัด milli:
+    final startUtc = DateTime.utc(
+      nowUtc.year,
+      nowUtc.month,
+      nowUtc.day,
+      nowUtc.hour,
+      nowUtc.minute,
+      nowUtc.second,
+    );
+    // ตัด lateCutoff ไม่ให้เกินอายุ session
+    final safeLateCutoff = lateCutoffMinutes > expiresInMinutes
+        ? expiresInMinutes
+        : lateCutoffMinutes;
 
-    //  ตรง schema: ต้องมี latitude/longitude
+    final lateCutoffUtc = startUtc.add(Duration(minutes: safeLateCutoff));
+    final endUtc = startUtc.add(Duration(minutes: expiresInMinutes));
+
+    // ส่ง ISO8601 (มี 'Z' เพราะเป็น UTC)
+    String _isoZ(DateTime dt) => dt.toIso8601String();
+
+    final url = Uri.parse('${API_BASE_URL}/sessions/open');
     final body = <String, dynamic>{
       'class_id': classId,
-      'duration_minutes': expiresInMinutes,
-      'radius_meters': radiusMeters.toDouble(),
-      'latitude': latitude, 
+      'latitude': latitude,
       'longitude': longitude,
+      'radius_meters': radiusMeters.toDouble(),
+
+      // 👇 ฟิลด์ที่ฝั่ง backend รับอยู่แล้ว
+      'start_time': _isoZ(startUtc),
+      'late_cutoff_time': _isoZ(lateCutoffUtc),
+      'end_time': _isoZ(endUtc),
     };
 
     final res = await http.post(
@@ -70,14 +95,18 @@ static Future<AttendanceSession> openSession({
       body: jsonEncode(body),
     );
 
+    // ช่วยดีบักให้เห็น payload/response
+    // ignore: avoid_print
+    print('[openSession] POST $url');
+    print('[openSession] body: $body');
+    print('[openSession] status=${res.statusCode} resp=${res.body}');
+
     if (res.statusCode == 200 || res.statusCode == 201) {
       return AttendanceSession.fromJson(jsonDecode(res.body));
     } else {
-      print('❌ [openSession] Error ${res.statusCode}: ${res.body}');
       throw Exception('Open session failed [${res.statusCode}]: ${res.body}');
     }
   }
-
 
   /// (ฝั่งครู) อัปเดต anchor ของอาจารย์หลังเปิด session
   /// NOTE: endpoint นี้จะผูก anchor กับคลาส/เซสชันล่าสุดตามที่ backend คุณกำหนด

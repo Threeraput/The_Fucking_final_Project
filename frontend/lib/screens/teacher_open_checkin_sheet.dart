@@ -1,6 +1,5 @@
 // lib/screens/teacher_open_checkin_sheet.dart
 import 'package:flutter/material.dart';
-import 'package:numberpicker/numberpicker.dart';
 import '../services/attendance_service.dart';
 import '../utils/location_helper.dart';
 
@@ -15,6 +14,9 @@ class TeacherOpenCheckinSheet extends StatefulWidget {
 
 class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
   final _minCtl = TextEditingController(text: '15');
+  final _lateCtl = TextEditingController(
+    text: '10',
+  ); // 👈 เพิ่มช่อง Late Cutoff (นาที)
   final _radiusCtl = TextEditingController(text: '100');
   final _formKey = GlobalKey<FormState>();
   bool _posting = false;
@@ -22,6 +24,7 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
   @override
   void dispose() {
     _minCtl.dispose();
+    _lateCtl.dispose(); // 👈 dispose ด้วย
     _radiusCtl.dispose();
     super.dispose();
   }
@@ -34,28 +37,46 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     return null;
   }
 
+  // ใช้ validator สำหรับ late cutoff ที่ต้องไม่เกิน minutes
+  String? _lateCutoffValidator(String? v) {
+    final base = _requiredInt(v, min: 1, max: 1440);
+    if (base != null) return base;
+
+    final minutes = int.tryParse(_minCtl.text.trim());
+    final cutoff = int.tryParse(v!.trim());
+    if (minutes != null && cutoff != null && cutoff > minutes) {
+      return 'ต้องไม่เกินเวลาหมดอายุ (${minutes} นาที)';
+    }
+    return null;
+  }
+
   Future<void> _open() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final minutes = int.parse(_minCtl.text.trim());
+    final minutes = int.parse(_minCtl.text.trim()); // เช่น 60
+    final cutoff = int.parse(_lateCtl.text.trim()); // เช่น 10
     final radius = int.parse(_radiusCtl.text.trim());
+
+    // กันกรณีที่มีการแก้ไขค่าแล้ว validator ไม่จับทัน
+    if (cutoff > minutes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เวลาตัดสายต้องไม่เกินเวลาหมดอายุ')),
+      );
+      return;
+    }
 
     setState(() => _posting = true);
     try {
-      // 1) อ่าน GPS ก่อน เพื่อส่งไปกับ openSession (backend ต้องการ)
       final pos = await LocationHelper.getCurrentPositionOrThrow();
 
-      // 2) เปิด session พร้อม latitude/longitude
       await AttendanceService.openSession(
         classId: widget.classId,
-        expiresInMinutes: minutes,
+        expiresInMinutes: minutes, // ใช้เวลาหมดอายุรวม
         radiusMeters: radius,
-        latitude: pos.latitude, // 👈 ใหม่
-        longitude: pos.longitude, // 👈 ใหม่
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        lateCutoffMinutes: cutoff, // 👈 ส่ง cutoff ไปด้วย
       );
-
-      // 3) ไม่ต้องเรียก updateTeacherAnchor แล้ว (ลบทิ้ง)
-      // await AttendanceService.updateTeacherAnchor(...);  // ❌ ลบ
 
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -64,7 +85,8 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
       ).showSnackBar(const SnackBar(content: Text('ประกาศเช็คชื่อสำเร็จ')));
     } catch (e) {
       if (!mounted) return;
-      print('🧩 [TeacherOpenCheckinSheet] error: $e'); // ไว้debugต่อ
+      // ignore: avoid_print
+      print('🧩 [TeacherOpenCheckinSheet] error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
@@ -73,7 +95,6 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     }
   }
 
-  
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
@@ -98,89 +119,35 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
+
+            // หมดอายุใน (นาที)
             TextFormField(
-              readOnly: true,
               controller: _minCtl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'หมดอายุใน (นาที)',
                 border: OutlineInputBorder(),
-                helperText: 'เช่น 15 นาที',
-                suffixIcon: Icon(Icons.timer_outlined),
+                helperText: 'เช่น 15, 30, 60 นาที',
               ),
-              onTap: () async {
-              int currentValue = int.tryParse(_minCtl.text) ?? 15;
-              int tempValue = currentValue;
-
-await showModalBottomSheet(
-  context: context,
-  isScrollControlled: true,
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-  ),
-  builder: (context) {
-    
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        top: 16,
-        left: 16,
-        right: 16,
-      ),
-      child: StatefulBuilder(
-        builder: (context, setModalState) {
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('เลือกเวลาหมดอายุ (นาที)',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 180,
-                child: NumberPicker(
-                  value: tempValue,
-                  minValue: 1,
-                  maxValue: 240,
-                  onChanged: (val) => setModalState(() => tempValue = val),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      style: TextStyle(color: Colors.grey),
-                      'ยกเลิก'),
-                  ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                    ),
-                    onPressed: () {
-                      setState(() => _minCtl.text = tempValue.toString());
-                      Navigator.pop(context);
-                    },
-                    child: const Text('ตกลง'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
-          );
-        },
-      ),
-    );
-  },
-);
-
-
-              },
               validator: (v) => _requiredInt(v, min: 1, max: 240),
             ),
-            
             const SizedBox(height: 12),
+
+            // เวลาตัดสาย (นาทีหลังเริ่ม)
+            TextFormField(
+              controller: _lateCtl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'เวลาตัดสาย (นาทีหลังเริ่ม)',
+                border: const OutlineInputBorder(),
+                helperText:
+                    'เช่น 10 นาที (ต้องไม่เกินเวลาหมดอายุ ${_minCtl.text} นาที)',
+              ),
+              validator: _lateCutoffValidator,
+            ),
+            const SizedBox(height: 12),
+
+            // รัศมี (เมตร)
             TextFormField(
               controller: _radiusCtl,
               keyboardType: TextInputType.number,
@@ -191,19 +158,17 @@ await showModalBottomSheet(
               ),
               validator: (v) => _requiredInt(v, min: 10, max: 2000),
             ),
+
             const SizedBox(height: 16),
             FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(44),
-              ),
               onPressed: _posting ? null : _open,
               icon: const Icon(Icons.play_circle_outline),
               label: _posting
                   ? const Text('กำลังเปิด...')
                   : const Text('เริ่มเช็คชื่อ'),
-              
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
             ),
           ],
         ),

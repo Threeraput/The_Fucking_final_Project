@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/attendance_session.dart';
 import '../services/auth_service.dart';
 
 class SessionsService {
-  static const String baseUrl = '$API_BASE_URL/sessions';
+  static const String _attendanceBase = '$API_BASE_URL/attendance';
+  static const String _sessionsBase = '$_attendanceBase/sessions';
+  static const String _reverifyBase = '$_attendanceBase/re-verify';
+
+  static const Duration _timeout = Duration(seconds: 20);
 
   /// เปิด session เช็คชื่อของอาจารย์
   static Future<AttendanceSession> openSession({
@@ -17,7 +22,7 @@ class SessionsService {
     final token = await AuthService.getAccessToken();
     if (token == null) throw Exception('Not authenticated');
 
-    final url = Uri.parse('$baseUrl/open');
+    final url = Uri.parse('$_sessionsBase/open');
     final body = {
       'class_id': classId,
       'duration_minutes': durationMinutes,
@@ -26,19 +31,28 @@ class SessionsService {
       if (anchorLon != null) 'anchor_lon': anchorLon,
     };
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode(body),
-    );
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return AttendanceSession.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Open session failed: ${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final json = jsonDecode(response.body);
+        return AttendanceSession.fromJson(json);
+      } else {
+        throw Exception(
+          'Open session failed [${response.statusCode}]: ${response.body}',
+        );
+      }
+    } on SocketException {
+      throw Exception('Network error while opening session');
     }
   }
 
@@ -47,19 +61,68 @@ class SessionsService {
     final token = await AuthService.getAccessToken();
     if (token == null) throw Exception('Not authenticated');
 
-    final url = Uri.parse('$baseUrl/active');
-    final response = await http.get(
-      url,
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final url = Uri.parse('$_sessionsBase/active');
 
-    if (response.statusCode == 200) {
-      final list = jsonDecode(response.body) as List<dynamic>;
-      return list
-          .map((e) => AttendanceSession.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } else {
-      throw Exception('Fetch sessions failed: ${response.body}');
+    try {
+      final response = await http
+          .get(
+            url,
+            headers: {
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+              HttpHeaders.acceptHeader: 'application/json',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        return list
+            .map((e) => AttendanceSession.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } else {
+        throw Exception(
+          'Fetch sessions failed [${response.statusCode}]: ${response.body}',
+        );
+      }
+    } on SocketException {
+      throw Exception('Network error while fetching sessions');
+    }
+  }
+
+  /// 🔹 เปิด/ปิด reverify สำหรับ session
+  /// ใช้ endpoint: POST /attendance/re-verify/toggle
+  static Future<bool> toggleReverify({
+    required String sessionId,
+    required bool enabled,
+  }) async {
+    final token = await AuthService.getAccessToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final url = Uri.parse('$_reverifyBase/toggle');
+    final body = {'session_id': sessionId, 'enabled': enabled};
+
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {
+              HttpHeaders.contentTypeHeader: 'application/json',
+              HttpHeaders.authorizationHeader: 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        final map = jsonDecode(response.body) as Map<String, dynamic>;
+        return map['reverify_enabled'] == true;
+      } else {
+        throw Exception(
+          'Toggle reverify failed [${response.statusCode}]: ${response.body}',
+        );
+      }
+    } on SocketException {
+      throw Exception('Network error while toggling reverify');
     }
   }
 }

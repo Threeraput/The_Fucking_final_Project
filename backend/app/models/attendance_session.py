@@ -1,6 +1,6 @@
 # backend/app/models/attendance_session.py
 import uuid
-from sqlalchemy import Column, ForeignKey, DateTime, Integer, func, Numeric, CheckConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, DateTime, Integer, func, Numeric, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -20,7 +20,7 @@ class AttendanceSession(Base):
     late_cutoff_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False) 
     radius_meters = Column(Integer, nullable=False)
-    
+    reverify_enabled = Column(Boolean, nullable=False, server_default="false") 
     # Anchor Point สำหรับ Geofencing ณ เวลาประกาศ
     anchor_lat = Column(Numeric(9, 6), nullable=False)
     anchor_lon = Column(Numeric(9, 6), nullable=False)
