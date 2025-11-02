@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
+import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_announcement_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
@@ -17,6 +18,7 @@ import 'package:frontend/models/feed_item.dart';
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
   final String? className; // เผื่อส่งชื่อมาจาก Card
+  
 
   const ClassDetailsScreen({super.key, required this.classId, this.className});
 
@@ -131,12 +133,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           255,
           255,
         ), // 🔹 พื้นหลัง
-        selectedItemColor: const Color.fromARGB(
-          255,
-          65,
-          171,
-          179,
-        ), // 🔹 สีไอคอนและข้อความที่เลือก
+        selectedItemColor: Colors.blueAccent, // 🔹 สีไอคอนและข้อความที่เลือก
         unselectedItemColor: const Color.fromARGB(
           255,
           39,
@@ -189,8 +186,14 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   }
 }
 
+<<<<<<< HEAD
 class _StreamTab extends StatefulWidget {
   final String classId;
+=======
+final color = getClassColor('Example Class'); // ตัวอย่างการใช้ฟังก์ชัน
+class _StreamTab extends StatelessWidget {
+  final String classId; // ✅ เพิ่ม
+>>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487
   final Classroom? classroom;
   final bool isTeacher;
   final VoidCallback onCreateAnnouncement;
@@ -201,6 +204,7 @@ class _StreamTab extends StatefulWidget {
     required this.isTeacher,
     required this.onCreateAnnouncement,
   });
+
 
   @override
   State<_StreamTab> createState() => _StreamTabState();
@@ -231,6 +235,7 @@ class _StreamTabState extends State<_StreamTab> {
         children: [
           if (c != null)
             Card(
+              color: getClassColor(c.name ?? 'Class'), // ใช้ฟังก์ชันใหม่
               elevation: 3,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -404,3 +409,220 @@ class _PeopleTab extends StatelessWidget {
     );
   }
 }
+<<<<<<< HEAD
+=======
+
+/// ======================
+/// Active Sessions Section
+/// ======================
+class _ActiveSessionsSection extends StatefulWidget {
+  final String classId;
+  final bool isTeacher;
+  const _ActiveSessionsSection({
+    required this.classId,
+    required this.isTeacher,
+  });
+
+  @override
+  State<_ActiveSessionsSection> createState() => _ActiveSessionsSectionState();
+}
+
+class _ActiveSessionsSectionState extends State<_ActiveSessionsSection> {
+  late Future<List<Map<String, dynamic>>> _futureSessions;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureSessions = _loadSessions();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadSessions() async {
+    final all = await AttendanceService.getActiveSessions();
+    return all
+        .where((m) => (m['class_id']?.toString() ?? '') == widget.classId)
+        .toList();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _futureSessions = _loadSessions();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _futureSessions,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              'ไม่สามารถโหลด Session ได้: ${snapshot.error}',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          );
+        }
+
+        final sessions = snapshot.data ?? [];
+        if (sessions.isEmpty) {
+          if (widget.isTeacher) {
+            return Card(
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Text('ยังไม่มีการเปิดเช็คชื่อ')),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blueAccent, // พื้นหลังปุ่ม
+                        foregroundColor: Colors.white, // สีของข้อความและไอคอน
+                        shadowColor: Colors.black26, // สีเงาของปุ่ม
+                        elevation: 3, // ความสูงของเงา
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final opened = await showModalBottomSheet<bool>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) =>
+                              TeacherOpenCheckinSheet(classId: widget.classId),
+                        );
+                        if (opened == true) _refresh();
+                      },
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('เปิดเช็คชื่อ'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }
+
+        // มี session -> แสดงการ์ดทั้งหมด
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'เช็คชื่อที่กำลังเปิดอยู่',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            ...sessions.map(
+              (s) => _ActiveSessionCard(
+                data: s,
+                isTeacher: widget.isTeacher,
+                classId: widget.classId,
+                onRefetch: _refresh,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ActiveSessionCard extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final bool isTeacher;
+  final String classId;
+  final Future<void> Function() onRefetch;
+
+  const _ActiveSessionCard({
+    required this.data,
+    required this.isTeacher,
+    required this.classId,
+    required this.onRefetch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final df = DateFormat('HH:mm');
+    final expiresAt = DateTime.tryParse(data['expires_at']?.toString() ?? '');
+    final expTxt = expiresAt != null
+        ? 'หมดอายุ ${df.format(expiresAt.toLocal())}'
+        : 'ไม่ทราบเวลา';
+    final radius = data['radius_meters']?.toString() ?? '-';
+    final lat = data['anchor_lat']?.toString() ?? '-';
+    final lon = data['anchor_lon']?.toString() ?? '-';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: const Icon(Icons.access_time),
+        title: const Text(
+          style: TextStyle(fontSize: 16),
+          'Session กำลังเปิดอยู่',
+        ),
+        subtitle: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('$expTxt · รัศมี $radius m'),
+        Text(
+          style: const TextStyle(fontSize: 10),
+          'Anchor: $lat, $lon'),
+      ],
+    ),
+        trailing: isTeacher
+            ? FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.blueAccent, // พื้นหลังปุ่ม
+                  foregroundColor: Colors.white, // สีของข้อความและไอคอน
+                  shadowColor: Colors.black26, // สีเงาของปุ่ม
+                  elevation: 3, // ความสูงของเงา
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  final opened = await showModalBottomSheet<bool>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => TeacherOpenCheckinSheet(classId: classId),
+                  );
+                  if (opened == true) onRefetch();
+                },
+                child: const Text('เปิดใหม่'),
+              )
+            : FilledButton(
+                onPressed: () async {
+                  final ok = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StudentCheckinScreen(classId: classId),
+                    ),
+                  );
+                  if (ok == true) onRefetch();
+                },
+                child: const Text('เช็คชื่อ'),
+              ),
+      ),
+    );
+  }
+}
+>>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487

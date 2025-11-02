@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/verify_face_route.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -108,7 +109,27 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Face Attendance App',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        textSelectionTheme: TextSelectionThemeData(
+          selectionHandleColor: Colors.blue, // สีจุดจับ
+          selectionColor: Colors.blue.shade200, // สีพื้นหลังตอนเลือกข้อความ
+          cursorColor: Color.fromARGB(209, 35, 35, 35), // สีเคอร์เซอร์
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: Color.fromARGB(212, 134, 134, 134), // สีกรอบเวลาพิมพ์
+              width: 2,
+            ),
+          ),
+          floatingLabelStyle: const TextStyle(
+            color: Color.fromARGB(255, 134, 134, 134), // สี label ตอนโฟกัส
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        primarySwatch: Colors.blue,
+      ),
       initialRoute: initialRoute,
       onGenerateRoute: _onGenerateRoute,
       routes: {

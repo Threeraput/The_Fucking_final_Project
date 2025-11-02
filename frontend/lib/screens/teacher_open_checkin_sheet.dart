@@ -1,5 +1,6 @@
 // lib/screens/teacher_open_checkin_sheet.dart
 import 'package:flutter/material.dart';
+import 'package:numberpicker/numberpicker.dart';
 import '../services/attendance_service.dart';
 import '../utils/location_helper.dart';
 
@@ -33,7 +34,7 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     return null;
   }
 
-Future<void> _open() async {
+  Future<void> _open() async {
     if (!_formKey.currentState!.validate()) return;
 
     final minutes = int.parse(_minCtl.text.trim());
@@ -72,6 +73,7 @@ Future<void> _open() async {
     }
   }
 
+  
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
@@ -97,15 +99,87 @@ Future<void> _open() async {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              readOnly: true,
               controller: _minCtl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'หมดอายุใน (นาที)',
                 border: OutlineInputBorder(),
                 helperText: 'เช่น 15 นาที',
+                suffixIcon: Icon(Icons.timer_outlined),
               ),
+              onTap: () async {
+              int currentValue = int.tryParse(_minCtl.text) ?? 15;
+              int tempValue = currentValue;
+
+await showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  ),
+  builder: (context) {
+    
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        top: 16,
+        left: 16,
+        right: 16,
+      ),
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('เลือกเวลาหมดอายุ (นาที)',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 180,
+                child: NumberPicker(
+                  value: tempValue,
+                  minValue: 1,
+                  maxValue: 240,
+                  onChanged: (val) => setModalState(() => tempValue = val),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      style: TextStyle(color: Colors.grey),
+                      'ยกเลิก'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                    onPressed: () {
+                      setState(() => _minCtl.text = tempValue.toString());
+                      Navigator.pop(context);
+                    },
+                    child: const Text('ตกลง'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          );
+        },
+      ),
+    );
+  },
+);
+
+
+              },
               validator: (v) => _requiredInt(v, min: 1, max: 240),
             ),
+            
             const SizedBox(height: 12),
             TextFormField(
               controller: _radiusCtl,
@@ -119,14 +193,17 @@ Future<void> _open() async {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(44),
+              ),
               onPressed: _posting ? null : _open,
               icon: const Icon(Icons.play_circle_outline),
               label: _posting
                   ? const Text('กำลังเปิด...')
                   : const Text('เริ่มเช็คชื่อ'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-              ),
+              
             ),
           ],
         ),
