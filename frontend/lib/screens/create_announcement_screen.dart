@@ -65,23 +65,33 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
         children: [
           TextField(
             controller: _titleCtl,
-            decoration: const InputDecoration(
+            maxLines: 1,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.article_outlined),
               labelText: 'หัวข้อ',
-              border: OutlineInputBorder(),
+               border: OutlineInputBorder(
+                 borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _bodyCtl,
-            maxLines: 6,
-            decoration: const InputDecoration(
+            maxLines: null,
+            decoration: InputDecoration(
               labelText: 'รายละเอียด',
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               alignLabelWithHint: true,
             ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: _posting ? null : _post,
             icon: const Icon(Icons.campaign),
             label: _posting

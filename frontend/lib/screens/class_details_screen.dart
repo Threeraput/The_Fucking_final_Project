@@ -222,12 +222,16 @@ class _StreamTab extends StatelessWidget {
                   children: [
                     Text(
                       c.name ?? '—',
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 8),
                     Text('Code: ${c.code ?? '-'}'),
                     const SizedBox(height: 4),
                     Text(
+                      style: const TextStyle(color: Colors.white70),
                       'Teacher: ${c.teacher?.username ?? c.teacher?.email ?? '-'}',
                     ),
                     if ((c.description ?? '').isNotEmpty) ...[
@@ -247,9 +251,14 @@ class _StreamTab extends StatelessWidget {
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: onCreateAnnouncement,
-              icon: const Icon(Icons.campaign),
-              label: const Text('Create Announcement'),
+              icon: const Icon(
+                Icons.campaign
+                ),
+              label: const Text(
+                style: TextStyle(color: Colors.black),
+                'Create Announcement'),
               style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.black38, // สีข้อความและไอคอน
                 minimumSize: const Size.fromHeight(44),
               ),
             ),

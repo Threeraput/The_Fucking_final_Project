@@ -102,17 +102,45 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
               children: [
                 TextFormField(
                   controller: _nameCtl,
-                  decoration: const InputDecoration(labelText: 'ชื่อคลาส'),
+                  decoration: InputDecoration(
+                    labelText: 'ชื่อคลาส',
+                    labelStyle: const TextStyle(
+                    color: Colors.blueGrey,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                    hintText: 'กรอกชื่อคลาสของคุณ เช่น คณิตศาสตร์ ม.4/1',
+                    hintStyle: const TextStyle(color: Colors.black45, fontSize: 14), 
+                    
+                    prefixIcon: const Icon(Icons.class_, color: Colors.blueAccent),
+
+                    enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300, width: 1.2),
+                  ),
+                    ),
                   validator: (v) =>
                       (v == null || v.trim().isEmpty) ? 'กรอกชื่อคลาส' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _descCtl,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'คำอธิบาย (ไม่บังคับ)',
+                    labelStyle: const TextStyle(
+                    color: Colors.blueGrey,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
                   ),
-                  maxLines: 2,
+                  hintText: 'กรอกคำอธิบายคลาสของคุณ',
+                  hintStyle: const TextStyle(color: Colors.black45, fontSize: 14),
+                  
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300, width: 1.2),  
+                  ),
+                ),
+                maxLines: 2,
                 ),
                 const SizedBox(height: 12),
                 Row(

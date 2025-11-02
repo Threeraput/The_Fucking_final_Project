@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:frontend/models/users.dart';
 import 'package:frontend/models/classroom.dart';
+import 'package:frontend/screens/profile_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
 import 'class_details_screen.dart';
@@ -10,6 +11,7 @@ import 'join_class_sheet.dart';
 import 'student_class_view.dart';
 import '../screens/camera_screen.dart';
 import '../services/face_service.dart';
+
 
 class ClassroomHomeScreen extends StatefulWidget {
   const ClassroomHomeScreen({super.key});
@@ -101,25 +103,34 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         child: Column(
           children: [
             // 🔹 ส่วนหัว
-            UserAccountsDrawerHeader(
-              accountName: Text(me.username ?? 'ไม่ทราบชื่อ'),
-              accountEmail: Text(me.email ?? ''),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.deepOrangeAccent,
-                child: Text(
-                  (me.username?.isNotEmpty == true ? me.username![0] : '?')
-                      .toUpperCase(),
-                  style: const TextStyle(fontSize: 24, color: Colors.white),
-                ),
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blueAccent, Colors.lightBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
+           UserAccountsDrawerHeader(
+  accountName: Text(me.username ?? 'ไม่ทราบชื่อ'),
+  accountEmail: Text(me.email ?? ''),
+  currentAccountPicture: GestureDetector(
+    onTap: () {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProfilePage(user: me),
+        ),
+      );
+    },
+    child: CircleAvatar(
+      backgroundColor: Colors.deepOrangeAccent,
+      child: Text(
+        (me.username?.isNotEmpty == true ? me.username![0] : '?')
+            .toUpperCase(),
+        style: const TextStyle(fontSize: 24, color: Colors.white),
+      ),
+    ),
+  ),
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      colors: [Colors.blueAccent, Colors.lightBlue],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+  ),
+),
 
             // 🔹 เมนูหลัก
             Expanded(
@@ -426,7 +437,25 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   Widget build(BuildContext context) {
     final me = _me;
     return Scaffold(
-      appBar: AppBar(title: const Text('Classroom')),
+      appBar: AppBar(
+        title: const Text('Classroom'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            tooltip: 'Profile',
+            onPressed: () {
+              // นำทางไปหน้า Profile
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(
+                    user: me!,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       drawer: _buildDrawer(),
       floatingActionButton: FloatingActionButton(
         onPressed: _isTeacher ? _openCreate : _openJoin,
