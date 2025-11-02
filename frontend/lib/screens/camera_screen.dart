@@ -341,26 +341,10 @@ Future<void> _captureAndProcess() async {
         ? 'ยืนยันตัวตนซ้ำ (Re-verify)'
         : (widget.isVerificationMode
               ? 'ยืนยันตัวตนด้วยใบหน้า'
-<<<<<<< HEAD
               : 'เพิ่มรูปภาพใบหน้า');
 
     return Scaffold(
       appBar: AppBar(title: Text(appBarTitle)),
-=======
-              : 'เพิ่มรูปภาพใบหน้า',
-        ),
-        // iconTheme: const IconThemeData(color: Colors.black),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
-            );
-          },
-        ),
-      ),
->>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487
       body: controller == null
           ? const Center(child: CircularProgressIndicator())
           : FutureBuilder<void>(

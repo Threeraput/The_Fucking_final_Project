@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
 import 'package:frontend/screens/student_reverify_screen.dart';
 import 'package:frontend/utils/location_helper.dart';
-=======
-import 'package:frontend/screens/classroom_home_screen.dart';
->>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487
 import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
+import "package:frontend/screens/classroom_home_screen.dart";
 
 class StudentClassView extends StatefulWidget {
   final String classId; // <- ต้องเป็น UUID ของคลาส
@@ -84,6 +81,7 @@ class _StudentClassViewState extends State<StudentClassView> {
 }
 
 final color = getClassColor('Example Class'); // ตัวอย่างการใช้ฟังก์ชัน
+
 class _StudentStreamTab extends StatelessWidget {
   final String classId;
   final String className;
@@ -219,7 +217,6 @@ class _StudentActiveSessionsSectionState
   Timer? _timer;
   String? sessionId;
 
-
   @override
   void initState() {
     super.initState();
@@ -341,11 +338,10 @@ class _StudentActiveSessionsSectionState
                   leading: const Icon(Icons.access_time),
                   title: const Text(
                     style: TextStyle(fontSize: 16),
-                    'Session กำลังเปิดอยู่'
-                    ),
+                    'Session กำลังเปิดอยู่',
+                  ),
                   subtitle: Text(subtitle.isEmpty ? '-' : subtitle),
-<<<<<<< HEAD
-                trailing: Wrap(
+                  trailing: Wrap(
                     spacing: 8,
                     children: [
                       // ปุ่มเช็คชื่อ (เดิม)
@@ -431,30 +427,7 @@ class _StudentActiveSessionsSectionState
                         },
                       ),
                     ],
-=======
-                  trailing: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      foregroundColor: Colors.white, 
-                      shadowColor: Colors.black26, // สีเงาของปุ่ม
-                      elevation: 3, // ความสูงของเงา
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                
-                    ),
-                    onPressed: () async {
-                      final ok = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              StudentCheckinScreen(classId: widget.classId),
-                        ),
-                      );
-                      if (ok == true) _refresh();
-                    },
-                    child: const Text('เช็คชื่อ'),
->>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487
                   ),
-                  
                 ),
               );
             }),

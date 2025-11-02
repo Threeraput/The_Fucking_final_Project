@@ -126,21 +126,9 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               child: ListView(
                 children: [
                   ListTile(
-<<<<<<< HEAD
                     leading: Icon(Icons.class_, color: Colors.blueAccent),
                     title: Text(_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน'),
                     onTap: () => Navigator.pop(context),
-=======
-                    leading: Icon(
-                      Icons.class_, 
-                      color: Colors.blueAccent
-                      ),
-                    title: Text(
-                      _isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน',
-                    ),   
-                    onTap: () => Navigator.pop(context)
-                    
->>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487
                   ),
                   ListTile(
                     leading: const Icon(Icons.calendar_today),
@@ -438,11 +426,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         onPressed: _isTeacher ? _openCreate : _openJoin,
         tooltip: _isTeacher ? 'สร้างคลาสใหม่' : 'เข้าร่วมคลาส',
         backgroundColor: Colors.blueAccent,
-<<<<<<< HEAD
         child: const Icon(Icons.add, color: Colors.white),
-=======
-        child: const Icon(Icons.add, color: Colors.white,),
->>>>>>> 3cac7b7680873f1fa5dbaaf8b568bec90b473487
       ),
       body: me == null
           ? const Center(child: CircularProgressIndicator())
