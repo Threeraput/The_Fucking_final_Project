@@ -9,6 +9,8 @@ from app.api.v1 import auth, users , admin , face_recognition ,  classes , atten
 from app.services.db_service import initialize_roles_permissions
 from fastapi.staticfiles import StaticFiles
 
+from app.api.v1 import classwork_simple
+
 # ใช้ asynccontextmanager สำหรับ startup/shutdown events (ดีกว่า @app.on_event)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,7 +58,9 @@ app.include_router(classes.router, prefix="/api/v1")
 app.include_router(attendance.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/workpdf", StaticFiles(directory="workpdf"), name="workpdf")
 app.include_router(sessions.router, prefix="/api/v1")
+app.include_router(classwork_simple.router, prefix="/api/v1")
 # --- Optional: Default root endpoint ---
 @app.get("/")
 async def read_root():
