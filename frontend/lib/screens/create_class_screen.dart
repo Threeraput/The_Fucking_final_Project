@@ -39,6 +39,23 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       initialDate: init,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blueAccent,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blueAccent,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (d == null) return;
     setState(() {
@@ -86,6 +103,8 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +166,11 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.calendar_today),
+                        icon: const Icon(
+                          color: Colors.black38,
+                          Icons.calendar_today),
                         label: Text(
+                          style: TextStyle(color: Colors.black,),
                           _startAt == null
                               ? 'วันเริ่ม'
                               : _startAt!.toIso8601String().split('T').first,
@@ -159,8 +181,11 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.event),
+                        icon: const Icon(
+                          color: Colors.black38,
+                          Icons.event),
                         label: Text(
+                          style: TextStyle(color: Colors.black,),
                           _endAt == null
                               ? 'วันสิ้นสุด'
                               : _endAt!.toIso8601String().split('T').first,
@@ -172,6 +197,10 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    foregroundColor: Colors.white,
+                   ),
                   onPressed: _submit,
                   icon: _loading
                       ? const SizedBox(
@@ -180,7 +209,9 @@ class _CreateClassScreenState extends State<CreateClassScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.save),
-                  label: Text(editing ? 'บันทึกการแก้ไข' : 'สร้างห้องเรียน'),
+                  label: Text(
+                    style: TextStyle(fontSize: 16),
+                    editing ? 'บันทึกการแก้ไข' : 'สร้างห้องเรียน'),
                 ),
               ],
             ),

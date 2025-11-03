@@ -105,9 +105,16 @@ class _StudentStreamTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(className, style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  className, style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                Text('Teacher: $teacherName'),
+                Text(
+                  style: TextStyle(color: Colors.white70),
+                  'Teacher: $teacherName'),
               ],
             ),
           ),
