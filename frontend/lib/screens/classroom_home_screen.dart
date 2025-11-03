@@ -208,13 +208,15 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              title: Text(
-                                'ยืนยันการลบข้อมูลใบหน้า',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: titleFontSize,
+                              title: Center( // ปรับค่าตรงนี้ได้ เช่น 20, 30
+                                child: Text(  
+                                  'ยืนยันการลบข้อมูลใบหน้า',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: titleFontSize,
+                                  ),
+                                  
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                               content: Padding(
                                 padding: EdgeInsets.symmetric(

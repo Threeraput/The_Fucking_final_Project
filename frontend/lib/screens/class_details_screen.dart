@@ -319,6 +319,10 @@ class _StreamTabState extends State<_StreamTab> {
             ),
             const SizedBox(height: 8),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent, // สีพื้นหลัง
+                minimumSize: const Size.fromHeight(44),
+              ),
               onPressed: () async {
                 final created =
                     await showModalBottomSheet<Map<String, dynamic>?>(

@@ -37,7 +37,7 @@ class _StudentClassViewState extends State<StudentClassView> {
       appBar: AppBar(title: Text(widget.className)),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-        selectedItemColor: const Color.fromARGB(255, 65, 171, 179),
+        selectedItemColor: Colors.blueAccent,
         unselectedItemColor: const Color.fromARGB(255, 39, 39, 39),
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
@@ -141,10 +141,18 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
                 children: [
                   Text(
                     className,
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 8),
-                  Text('Teacher: $teacherName'),
+                  Text(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                    'Teacher: $teacherName'),
                 ],
               ),
             ),

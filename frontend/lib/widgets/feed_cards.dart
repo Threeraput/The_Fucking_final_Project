@@ -109,32 +109,66 @@ class _FeedCard extends StatelessWidget {
               title: 'เช็คชื่อ',
               dateText: dfTime.format(item.postedAt.toLocal()),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'เช็คชื่อกำลังเปิดอยู่',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-            Text(
-              '$exp · รัศมี ${radius ?? '-'} m',
-              style: Theme.of(context).textTheme.bodySmall,
+            RichText(
+              text: TextSpan(
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 14,
+                ), // ขนาดปกติของข้อความ
+                children: [
+                  TextSpan(text: '$exp · '), // ข้อความทั่วไป
+                  TextSpan(
+                    text: 'รัศมี ',
+                    style: const TextStyle(fontSize: 15), // ตัวอักษรใหญ่ขึ้น
+                  ),
+                  TextSpan(
+                    text: '${radius ?? '-'} m',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ), // ตัวหนาสำหรับค่า radius
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(height: 3),
             if (lat != null && lon != null)
               Text(
                 'Anchor: $lat, $lon',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            Text(
-              'Reverify: ${reverifyEnabled ? "ON" : "OFF"}',
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 3),
+            RichText(
+              text: TextSpan(
+                style: Theme.of(context).textTheme.bodySmall, // สไตล์พื้นฐาน
+                children: [
+                  const TextSpan(text: 'Reverify: '),
+                  TextSpan(
+                    text: reverifyEnabled ? 'ON' : 'OFF',
+                    style: TextStyle(
+                      color: reverifyEnabled
+                          ? Colors.green
+                          : Colors.grey, // ON=เขียว, OFF=เทา
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-
             const SizedBox(height: 8),
             Row(
               children: [
                 // ===== ปุ่มฝั่งครู =====
                 if (isTeacher) ...[
                   FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                    ),
                     onPressed: () async {
                       final ok = await showModalBottomSheet<bool>(
                         context: context,
@@ -167,6 +201,9 @@ class _FeedCard extends StatelessWidget {
                                       enabled
                                           ? 'เปิด reverify แล้ว'
                                           : 'ปิด reverify แล้ว',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
                                     ),
                                   ),
                                 );
@@ -187,6 +224,7 @@ class _FeedCard extends StatelessWidget {
                         : null,
                     child: Text(
                       reverifyEnabled ? 'ปิด reverify' : 'เปิด reverify',
+                      style: TextStyle(color: Colors.grey[800]),
                     ),
                   ),
                 ],
@@ -194,6 +232,9 @@ class _FeedCard extends StatelessWidget {
                 // ===== ปุ่มฝั่งนักเรียน =====
                 if (!isTeacher) ...[
                   FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                    ),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -208,6 +249,9 @@ class _FeedCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black,
+                    ),
                     onPressed: (canReverify && sessionId != null)
                         ? () async {
                             try {
@@ -235,8 +279,14 @@ class _FeedCard extends StatelessWidget {
 
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('ยืนยันตัวตนซ้ำสำเร็จ'),
+                                  SnackBar(
+                                    content: Text(
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      'ยืนยันตัวตนซ้ำสำเร็จ',
+                                    ),
                                   ),
                                 );
                               }
@@ -250,17 +300,19 @@ class _FeedCard extends StatelessWidget {
                             }
                           }
                         : null,
-                    icon: const Icon(Icons.verified_user_outlined),
-                    label: const Text('ยืนยันซ้ำ'),
+                    label: const Text(
+                      style: TextStyle(color: Colors.black),
+                      'ยืนยันซ้ำ',
+                    ),
                   ),
                 ],
 
                 const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.chat_bubble_outline),
-                  label: const Text('เพิ่มความคิดเห็น'),
-                ),
+                // OutlinedButton.icon(
+                //   onPressed: () {},
+                //   icon: const Icon(Icons.chat_bubble_outline),
+                //   label: const Text('เพิ่มความคิดเห็น'),
+                // ),
               ],
             ),
           ],
@@ -287,7 +339,9 @@ class _HeaderRow extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          backgroundColor: Colors.blueAccent.withOpacity(
+            0.15,
+          ), // พื้นหลังฟ้าอ่อน
           child: Icon(icon, size: 18, color: color),
         ),
         const SizedBox(width: 8),
