@@ -153,7 +153,7 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
           const SizedBox(height: 12),
 
           // แบนเนอร์เช็คชื่อที่กำลังเปิด (นักเรียน)
-   //ActiveSessionsBanner(classId: classId, isTeacherView: false),
+//ActiveSessionsBanner(classId: classId, isTeacherView: false),
 
           const SizedBox(height: 16),
           Text('Announcements', style: Theme.of(context).textTheme.titleMedium),

@@ -218,7 +218,7 @@ class _StreamTabState extends State<_StreamTab> {
 
   Future<void> _refresh({bool force = false}) async {
     setState(() {
-      _futureFeed = FeedService.getClassFeed(widget.classId, force: force).then(
+      _futureFeed = FeedService.getClassFeed(widget.classId).then(
         (list) {
           _lastFeed = list; // sync state ในหน่วยความจำ
           return list;
@@ -329,7 +329,7 @@ class _StreamTabState extends State<_StreamTab> {
                   // 1) โชว์ทันที (optimistic)
                   
                   if (!mounted) return;
-                  await Future.delayed(const Duration(seconds: 2));
+                  await Future.delayed(const Duration(seconds: 4));
                   insertOptimisticSession(created);
                   
                   ScaffoldMessenger.of(context).showSnackBar(

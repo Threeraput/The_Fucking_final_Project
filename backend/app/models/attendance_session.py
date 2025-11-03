@@ -38,3 +38,5 @@ class AttendanceSession(Base):
     
     def __repr__(self):
         return f"<AttendanceSession(class='{self.class_id}', start='{self.start_time.strftime('%Y-%m-%d %H:%M')}')>"
+    
+    

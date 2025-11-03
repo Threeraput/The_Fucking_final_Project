@@ -1,50 +1,49 @@
 // lib/services/feed_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+
 import '../models/feed_item.dart';
 import 'attendance_service.dart';
-import 'auth_service.dart';
+
+// 🔹 helper เล็กๆ อ่านค่าความจริงจากหลายคีย์ที่ backend อาจส่งมาแตกต่างกัน
+bool _truthy(Map<String, dynamic>? m, List<String> keys) {
+  if (m == null) return false;
+  for (final k in keys) {
+    final v = m[k];
+    if (v == true) return true;
+    if (v is String) {
+      final s = v.toLowerCase();
+      if (s == 'true' || s == 'passed' || s == 'completed' || s == 'ok') {
+        return true;
+      }
+    }
+    if (v is Map && (v['passed'] == true || v['completed'] == true)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 class FeedService {
-  /// รวบรวมฟีดของคลาส: เช็คชื่อ / งาน / ประกาศ แล้ว sort ตามเวลาโพสต์
-  static Future<List<FeedItem>> getClassFeed(
-    String classId, {
-    bool force = false,
-  }) async {
+  /// เดิม: สร้าง feed จาก active sessions (ยังไม่กรองตามสถานะนักเรียน)
+  static Future<List<FeedItem>> getClassFeed(String classId) async {
     final items = <FeedItem>[];
 
     try {
-      // ⬅️ ส่ง force ต่อไป
-      final sessions = await AttendanceService.getActiveSessions(force: force);
-
-      String? _classIdOf(Map<String, dynamic> s) {
-        final v1 = s['class_id'];
-        if (v1 is String && v1.isNotEmpty) return v1;
-        final v2 = s['classId'];
-        if (v2 is String && v2.isNotEmpty) return v2;
-        final c = s['class'] as Map<String, dynamic>?;
-        if (c != null) {
-          final v3 = c['class_id'] ?? c['id'];
-          if (v3 is String && v3.isNotEmpty) return v3;
-        }
-        return null;
-      }
-
+      final sessions = await AttendanceService.getActiveSessions();
       for (final s in sessions) {
-        if ((_classIdOf(s)?.toLowerCase().trim()) !=
-            classId.toLowerCase().trim())
-          continue;
+        if ((s['class_id']?.toString() ?? '') != classId) continue;
 
         final id = s['session_id']?.toString() ?? s['id']?.toString() ?? '';
         if (id.isEmpty) continue;
 
-        final start = DateTime.tryParse(s['start_time']?.toString() ?? '');
         final expires = DateTime.tryParse(
           s['end_time']?.toString() ?? s['expires_at']?.toString() ?? '',
         );
 
         final postedAt =
-            start ?? DateTime.now().subtract(const Duration(minutes: 1));
+            DateTime.tryParse(s['start_time']?.toString() ?? '') ??
+            DateTime.now().subtract(const Duration(minutes: 1));
 
         items.add(
           FeedItem(
@@ -68,5 +67,51 @@ class FeedService {
 
     items.sort((a, b) => b.postedAt.compareTo(a.postedAt));
     return items;
+  }
+
+  /// ✅ ใหม่: เวอร์ชัน “นักเรียน” — กรองทิ้งการ์ดเช็คชื่อถ้าผู้ใช้รายนี้
+  /// เช็คชื่อแล้ว **และ** reverify แล้ว
+  static Future<List<FeedItem>> getClassFeedForStudent(String classId) async {
+    final base = await getClassFeed(classId);
+    final result = <FeedItem>[];
+
+    for (final f in base) {
+      if (f.type != FeedType.checkin) {
+        result.add(f);
+        continue;
+      }
+      final sid = f.extra['session_id']?.toString();
+      if (sid == null || sid.isEmpty) {
+        result.add(f);
+        continue;
+      }
+
+      try {
+        final status = await AttendanceService.getMyStatusForSession(sid);
+        final hasCheckedIn = _truthy(status, [
+          'has_checked_in',
+          'checked_in',
+          'present',
+        ]);
+        final reverifyCompleted = _truthy(status, [
+          'reverify_completed',
+          'has_reverified',
+          'reverify_passed',
+          'reverified',
+          'reverify_status',
+          'latest_reverify',
+        ]);
+
+        // 🔍 เงื่อนไขที่คุณต้องการ: ซ่อนเมื่อ “เช็คชื่อแล้ว” และ “reverify แล้ว”
+        final hide = hasCheckedIn && reverifyCompleted;
+
+        if (!hide) result.add(f);
+      } catch (_) {
+        // ถ้าดึงสถานะไม่สำเร็จ อย่าซ่อนเพื่อไม่พลาดการ์ด
+        result.add(f);
+      }
+    }
+
+    return result;
   }
 }
