@@ -1,60 +1,52 @@
+# backend/app/utils/pdf_storage.py
+from __future__ import annotations
 import os
 import uuid
-from typing import Tuple
+from pathlib import Path
+from typing import Final
+
 from fastapi import UploadFile, HTTPException
-from starlette import status
 
-# 📁 โฟลเดอร์เก็บไฟล์ PDF (เปลี่ยนจาก uploads/classwork → workpdf)
-UPLOAD_DIR = os.path.join("workpdf")
+# โฟลเดอร์เก็บไฟล์: <repo-root>/workpdf
+# (__file__) = backend/app/utils/pdf_storage.py  → parents[2] = backend/
+_REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
+_UPLOAD_DIR: Final[Path] = _REPO_ROOT / "workpdf"
+_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# ขนาดไฟล์สูงสุด (10 MB)
-MAX_SIZE_BYTES = 10 * 1024 * 1024
+ALLOWED_MIME: Final[set[str]] = {"application/pdf"}
+MAX_SIZE_BYTES: Final[int] = 25 * 1024 * 1024  # 25 MB
 
-# สร้างโฟลเดอร์ถ้ายังไม่มี
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-def _is_pdf_signature(data: bytes) -> bool:
-    # PDF จะขึ้นต้นด้วย "%PDF"
-    return data.startswith(b"%PDF")
-
-async def save_pdf_only(file: UploadFile) -> str:
+async def save_pdf(file: UploadFile) -> str:
     """
-    รับเฉพาะไฟล์ PDF:
-    - ตรวจ MIME
-    - ตรวจ signature
-    - จำกัดขนาด
-    - เซฟเป็นชื่อสุ่ม .pdf
-    return: path แบบ relative ที่บันทึกไว้
+    บันทึกไฟล์ PDF ลงโฟลเดอร์ workpdf แล้วคืน path แบบ relative เช่น "workpdf/<uuid>.pdf"
+    - ตรวจ MIME type = application/pdf
+    - จำกัดขนาดไฟล์ ~25MB (ปรับได้)
     """
-    if file.content_type not in ("application/pdf", "application/x-pdf"):
-        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                            detail="Only PDF files are allowed")
+    if file.content_type not in ALLOWED_MIME:
+        raise HTTPException(status_code=400, detail="Only PDF is allowed")
 
-    # อ่านบางส่วนเพื่อตรวจ signature และวัดขนาด
-    first_chunk = await file.read(8 * 1024)   # 8KB แรก
-    if not _is_pdf_signature(first_chunk):
-        raise HTTPException(status_code=400, detail="Invalid PDF file")
-
-    # เก็บเนื้อไฟล์ทั้งหมดพร้อมจำกัดขนาด
-    chunks = [first_chunk]
-    total = len(first_chunk)
-    while True:
-        chunk = await file.read(1024 * 1024)  # 1MB ต่อรอบ
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > MAX_SIZE_BYTES:
-            raise HTTPException(status_code=413, detail="PDF too large (max 10 MB)")
-        chunks.append(chunk)
-
-    # ตั้งชื่อไฟล์ปลายทาง
+    # ตั้งชื่อไฟล์เป็น UUID เพื่อกันชน/ชื่อประหลาด
     filename = f"{uuid.uuid4()}.pdf"
-    dest_path = os.path.join(UPLOAD_DIR, filename)
+    dest_path = _UPLOAD_DIR / filename
 
-    # เขียนไฟล์ลงดิสก์
-    with open(dest_path, "wb") as f:
-        for c in chunks:
-            f.write(c)
+    # อ่านเป็นชิ้น ๆ เพื่อกันกินแรม และตรวจขนาดรวม
+    size = 0
+    try:
+        with dest_path.open("wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1MB/ครั้ง
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_SIZE_BYTES:
+                    try:
+                        dest_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise HTTPException(status_code=413, detail="PDF is too large")
+                out.write(chunk)
+    finally:
+        await file.close()
 
-    # คืน path แบบ relative (เช่น workpdf/xxxx.pdf)
-    return dest_path.replace("\\", "/")
+    # คืนเป็น path relative เพื่อเก็บลง DB
+    return f"workpdf/{filename}"

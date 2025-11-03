@@ -1,114 +1,227 @@
+# app/services/simple_classwork_service.py
 from __future__ import annotations
-from typing import List, Optional
+from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, timezone
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, func, or_
+import sqlalchemy as sa
 
-from fastapi import HTTPException, status, UploadFile
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-
-from app.models.classwork import Classwork
+from app.models.classwork_assignment import ClassworkAssignment
+from app.models.classwork_submission import ClassworkSubmission
 from app.models.classwork_enums import SubmissionLateness
-from app.utils.pdf_storage import save_pdf_only
+from app.models.class_model import Class
+from app.models.user import User
+from app.models.association import class_students
+from app.utils.pdf_storage import save_pdf  # คุณทำไว้แล้ว
+from fastapi import HTTPException as ApiException
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+# ---------- Helper ----------
+def _ensure_teacher_of_class(db: Session, teacher_id: UUID, class_id: UUID):
+    cls = db.query(Class).filter(
+        Class.class_id == class_id,
+        Class.teacher_id == teacher_id
+    ).first()
+    if not cls:
+        raise ApiException(403, "Only the class teacher can perform this action.")
+    return cls
 
-def _status_from(due_date: datetime, submitted_at: Optional[datetime]) -> SubmissionLateness:
-    if submitted_at is None:
-        return SubmissionLateness.NOT_SUBMITTED
-    # ทำให้เป็น timezone-aware
-    dd = due_date if due_date.tzinfo else due_date.replace(tzinfo=timezone.utc)
-    sa = submitted_at if submitted_at.tzinfo else submitted_at.replace(tzinfo=timezone.utc)
-    return SubmissionLateness.ON_TIME if sa <= dd else SubmissionLateness.LATE
+def _ensure_student_in_class(db: Session, student_id: UUID, class_id: UUID):
+    exists = db.query(class_students).filter(
+        class_students.c.class_id == class_id,
+        class_students.c.student_id == student_id
+    ).first()
+    if not exists:
+        raise ApiException(403, "Student is not enrolled in this class.")
 
-# ---------- สร้างใบงานแบบพื้นฐาน (1 คน) ----------
+# ---------- Core ----------
 def create_assignment(
     db: Session,
     *,
     teacher_id: UUID,
     class_id: UUID,
-    student_id: UUID,
     title: str,
     max_score: int,
     due_date: datetime,
-) -> Classwork:
-    obj = Classwork(
+) -> ClassworkAssignment:
+    _ensure_teacher_of_class(db, teacher_id, class_id)
+
+    obj = ClassworkAssignment(
         class_id=class_id,
         teacher_id=teacher_id,
-        student_id=student_id,
         title=title,
         max_score=max_score,
         due_date=due_date,
-        content_url=None,
-        submitted_at=None,
-        graded=False,
-        score=None,
-        submission_status=SubmissionLateness.NOT_SUBMITTED.value
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(obj)
     db.commit()
     db.refresh(obj)
     return obj
 
-# ---------- ส่งงาน: รับเฉพาะ PDF ----------
 async def submit_pdf(
     db: Session,
     *,
     assignment_id: UUID,
     student_id: UUID,
-    file: UploadFile,
-) -> Classwork:
-    obj = db.get(Classwork, assignment_id)
-    if not obj:
-        raise HTTPException(404, "Assignment not found")
-    if obj.student_id != student_id:
-        raise HTTPException(403, "Not your assignment")
+    file,  # UploadFile
+) -> ClassworkSubmission:
+    asg = db.query(ClassworkAssignment).filter(
+        ClassworkAssignment.assignment_id == assignment_id
+    ).first()
+    if not asg:
+        raise ApiException(404, "Assignment not found")
 
-    saved_path = await save_pdf_only(file)
-    now = _utcnow()
+    # ต้องเป็นนักเรียนในคลาสนั้น
+    _ensure_student_in_class(db, student_id, asg.class_id)
 
-    obj.content_url = saved_path
-    obj.submitted_at = now
-    obj.submission_status = _status_from(obj.due_date, now).value
-    db.add(obj)
+    # บันทึกไฟล์ PDF
+    stored_path = await save_pdf(file)  # คืนเช่น "workpdf/<uuid>.pdf"
+
+    # หา/สร้าง submission (1 คน ต่อ 1 assignment เท่านั้น - unique)
+    sub = db.query(ClassworkSubmission).filter(
+        ClassworkSubmission.assignment_id == assignment_id,
+        ClassworkSubmission.student_id == student_id,
+    ).first()
+
+    now = datetime.now(timezone.utc)
+    status = SubmissionLateness.NOT_SUBMITTED
+    if now <= asg.due_date:
+        status = SubmissionLateness.ON_TIME
+    else:
+        status = SubmissionLateness.LATE
+
+    if sub:
+        sub.content_url = stored_path
+        sub.submitted_at = now
+        sub.submission_status = status
+        sub.updated_at = now
+    else:
+        sub = ClassworkSubmission(
+            assignment_id=assignment_id,
+            student_id=student_id,
+            content_url=stored_path,
+            submitted_at=now,
+            submission_status=status,
+            graded=False,
+            score=None,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(sub)
+
     db.commit()
-    db.refresh(obj)
-    return obj
+    db.refresh(sub)
+    return sub
 
-# ---------- ดูรายการของนักเรียน ----------
-def list_my_assignments(
-    db: Session,
-    *,
-    student_id: UUID,
-    class_id: Optional[UUID] = None
-) -> List[Classwork]:
-    q = select(Classwork).where(Classwork.student_id == student_id)
-    if class_id:
-        q = q.where(Classwork.class_id == class_id)
-    q = q.order_by(Classwork.due_date.asc(), Classwork.title.asc())
-    return list(db.scalars(q).all())
+def list_assignments_for_student(
+    db: Session, *, class_id: UUID, student_id: UUID
+) -> List[tuple[ClassworkAssignment, Optional[ClassworkSubmission]]]:
+    # ต้องเป็นนักเรียนในคลาส
+    _ensure_student_in_class(db, student_id, class_id)
 
-# ---------- ครูให้คะแนน (พื้นฐาน) ----------
-def grade(
-    db: Session,
+    # left join assignment กับ submission ของ "ฉัน"
+    q = (
+        db.query(ClassworkAssignment, ClassworkSubmission)
+        .outerjoin(
+            ClassworkSubmission,
+            and_(
+                ClassworkSubmission.assignment_id == ClassworkAssignment.assignment_id,
+                ClassworkSubmission.student_id == student_id,
+            ),
+        )
+        .filter(ClassworkAssignment.class_id == class_id)
+        .order_by(ClassworkAssignment.due_date.asc())
+    )
+    return q.all()
+
+def list_submissions_for_teacher(
+    db: Session, *, assignment_id: UUID, teacher_id: UUID
+) -> List[ClassworkSubmission]:
+    # ยืนยันว่าเป็นครูเจ้าของงาน
+    asg = db.query(ClassworkAssignment).filter(
+        ClassworkAssignment.assignment_id == assignment_id
+    ).first()
+    if not asg:
+        raise ApiException(404, "Assignment not found")
+    _ensure_teacher_of_class(db, teacher_id, asg.class_id)
+
+    subs = (
+        db.query(ClassworkSubmission)
+        .filter(ClassworkSubmission.assignment_id == assignment_id)
+        .order_by(ClassworkSubmission.submitted_at.desc().nullslast())
+        .all()
+    )
+    return subs
+
+def grade_submission(
+    db: Session, *, assignment_id: UUID, student_id: UUID, teacher_id: UUID, score: int
+) -> ClassworkSubmission:
+    # ตรวจว่าเป็นครูเจ้าของงาน
+    asg = db.query(ClassworkAssignment).filter(
+        ClassworkAssignment.assignment_id == assignment_id
+    ).first()
+    if not asg:
+        raise ApiException(404, "Assignment not found")
+    _ensure_teacher_of_class(db, teacher_id, asg.class_id)
+
+    sub = db.query(ClassworkSubmission).filter(
+        ClassworkSubmission.assignment_id == assignment_id,
+        ClassworkSubmission.student_id == student_id,
+    ).first()
+    if not sub:
+        raise ApiException(404, "Submission not found")
+
+    if score < 0 or score > asg.max_score:
+        raise ApiException(400, f"Score must be between 0 and {asg.max_score}")
+
+    sub.score = score
+    sub.graded = True
+    sub.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(sub)
+    return sub
+
+def list_assignments_for_teacher_view(
+    db,
     *,
-    assignment_id: UUID,
+    class_id: UUID,
     teacher_id: UUID,
-    score: int
-) -> Classwork:
-    obj = db.get(Classwork, assignment_id)
-    if not obj:
-        raise HTTPException(404, "Assignment not found")
-    if obj.teacher_id != teacher_id:
-        raise HTTPException(403, "Not your assignment (teacher)")
+    target_student_id: Optional[UUID] = None,
+) -> List[tuple[ClassworkAssignment, Optional[ClassworkSubmission]]]:
+    # ต้องเป็นครูเจ้าของคลาส
+    cls = db.query(Class).filter(
+        Class.class_id == class_id,
+        Class.teacher_id == teacher_id
+    ).first()
+    if not cls:
+        # ใช้ ApiException หรือ HTTPException ตามที่คุณตั้งไว้
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Only the class teacher can view this class.")
 
-    if score < 0 or score > obj.max_score:
-        raise HTTPException(400, f"Score must be between 0 and {obj.max_score}")
+    q = db.query(ClassworkAssignment, ClassworkSubmission).filter(
+        ClassworkAssignment.class_id == class_id
+    )
 
-    obj.score = score
-    obj.graded = True
-    db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    return obj
+    if target_student_id:
+        # left join เฉพาะ submission ของนักเรียนเป้าหมาย
+        q = q.outerjoin(
+            ClassworkSubmission,
+            and_(
+                ClassworkSubmission.assignment_id == ClassworkAssignment.assignment_id,
+                ClassworkSubmission.student_id == target_student_id,
+            ),
+        )
+    else:
+        # ไม่มีนักเรียนเป้าหมาย -> left join เงื่อนไขเป็น False เพื่อให้ได้ None เสมอ
+        q = q.outerjoin(
+            ClassworkSubmission,
+            and_(
+                ClassworkSubmission.assignment_id == ClassworkAssignment.assignment_id,
+                sa.text("FALSE")
+            ),
+        )
+
+    q = q.order_by(ClassworkAssignment.due_date.asc())
+    return q.all()

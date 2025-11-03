@@ -12,3 +12,5 @@ from .user_face_sample import UserFaceSample # ตรวจสอบให้แ
 from .association import user_roles, role_permissions, class_students # ตรวจสอบให้แน่ใจว่ามีไฟล์ association.py
 from .teacher_location import TeacherLocation
 from .student_location import StudentLocation
+from .classwork_assignment import ClassworkAssignment
+from .classwork_submission import ClassworkSubmission
