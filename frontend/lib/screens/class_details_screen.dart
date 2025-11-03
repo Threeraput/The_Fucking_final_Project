@@ -5,20 +5,14 @@ import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_announcement_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
-import 'create_class_screen.dart';
-import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/teacher_open_checkin_sheet.dart';
-import 'package:frontend/screens/student_checkin_screen.dart'; //  เพิ่ม
-import 'package:intl/intl.dart';
 import 'package:frontend/services/feed_service.dart';
 import 'package:frontend/widgets/feed_cards.dart';
 import 'package:frontend/models/feed_item.dart';
 
-
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
   final String? className; // เผื่อส่งชื่อมาจาก Card
-  
 
   const ClassDetailsScreen({super.key, required this.classId, this.className});
 
@@ -27,6 +21,7 @@ class ClassDetailsScreen extends StatefulWidget {
 }
 
 class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
+  final GlobalKey<_StreamTabState> _streamKey = GlobalKey<_StreamTabState>();
   int _currentIndex = 0;
   bool _loading = true;
   bool _error = false;
@@ -98,14 +93,15 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           ],
         ),
       );
-      if (wantOpen == true) {
+     if (wantOpen == true) {
         final opened = await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           builder: (_) => TeacherOpenCheckinSheet(classId: widget.classId),
         );
         if (opened == true && mounted) {
-          setState(() {}); // รีเฟรช Stream -> Active sessions
+          _streamKey.currentState
+              ?.refreshFeed(); // เรียกแบบ force ผ่านเมธอดนี้แล้ว
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')));
@@ -169,6 +165,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
     switch (_currentIndex) {
       case 0:
         return _StreamTab(
+          key: _streamKey,
           classId: widget.classId, // ✅ ส่ง classId เข้าไป
           classroom: _classroom,
           isTeacher: _isTeacher,
@@ -193,12 +190,12 @@ class _StreamTab extends StatefulWidget {
   final VoidCallback onCreateAnnouncement;
 
   const _StreamTab({
+    Key? key, // ✅ รับ key
     required this.classId,
     required this.classroom,
     required this.isTeacher,
     required this.onCreateAnnouncement,
-  });
-
+  }) : super(key: key);
 
   @override
   State<_StreamTab> createState() => _StreamTabState();
@@ -207,15 +204,60 @@ class _StreamTab extends StatefulWidget {
 class _StreamTabState extends State<_StreamTab> {
   late Future<List<FeedItem>> _futureFeed;
 
+  // เก็บฟีดล่าสุดไว้ในหน่วยความจำ (เพื่อใส่การ์ดแบบทันที)
+  List<FeedItem> _lastFeed = const [];
+
   @override
   void initState() {
     super.initState();
-    _futureFeed = FeedService.getClassFeed(widget.classId);
+    _futureFeed = FeedService.getClassFeed(widget.classId).then((list) {
+      _lastFeed = list;
+      return list;
+    });
   }
 
-  Future<void> _refresh() async {
+  Future<void> _refresh({bool force = false}) async {
     setState(() {
-      _futureFeed = FeedService.getClassFeed(widget.classId);
+      _futureFeed = FeedService.getClassFeed(widget.classId, force: force).then(
+        (list) {
+          _lastFeed = list; // sync state ในหน่วยความจำ
+          return list;
+        },
+      );
+    });
+  }
+
+  void refreshFeed() => _refresh(force: true);
+
+  /// ใส่การ์ด session ใหม่แบบ optimistic (แสดงทันทีโดยไม่ต้องรูดรีเฟรช)
+  void insertOptimisticSession(Map<String, dynamic> s) {
+    final id = s['session_id']?.toString() ?? s['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+
+    final start = DateTime.tryParse(s['start_time']?.toString() ?? '');
+    final end = DateTime.tryParse(
+      s['end_time']?.toString() ?? s['expires_at']?.toString() ?? '',
+    );
+
+    final item = FeedItem(
+      id: id,
+      classId: widget.classId,
+      type: FeedType.checkin,
+      title: 'เช็คชื่อกำลังเปิดอยู่',
+      postedAt: start ?? DateTime.now(),
+      expiresAt: end,
+      extra: {
+        'session_id': id,
+        'reverify_enabled': s['reverify_enabled'] == true,
+        'radius': s['radius_meters'],
+        'anchor_lat': s['anchor_lat'],
+        'anchor_lon': s['anchor_lon'],
+      },
+    );
+
+    setState(() {
+      _lastFeed = [item, ..._lastFeed]; // ใส่บนสุด
+      _futureFeed = Future.value(_lastFeed); // ให้ FutureBuilder อัปเดตทันที
     });
   }
 
@@ -223,13 +265,14 @@ class _StreamTabState extends State<_StreamTab> {
   Widget build(BuildContext context) {
     final c = widget.classroom;
     return RefreshIndicator(
-      onRefresh: _refresh,
+      // รูดรีเฟรช -> เอาแบบ force กันแคชไปเลย
+      onRefresh: () => _refresh(force: true),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (c != null)
             Card(
-              color: getClassColor(c.name ?? 'Class'), // ใช้ฟังก์ชันใหม่
+              color: getClassColor(c.name ?? 'Class'),
               elevation: 3,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -258,7 +301,7 @@ class _StreamTabState extends State<_StreamTab> {
               ),
             ),
 
-          // ปุ่มสร้างประกาศ (ครู)
+          // ปุ่มฝั่งครู
           if (widget.isTeacher) ...[
             const SizedBox(height: 12),
             ElevatedButton.icon(
@@ -272,13 +315,28 @@ class _StreamTabState extends State<_StreamTab> {
             const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: () async {
-                final opened = await showModalBottomSheet<bool>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) =>
-                      TeacherOpenCheckinSheet(classId: widget.classId),
-                );
-                if (opened == true) _refresh();
+                final created =
+                    await showModalBottomSheet<Map<String, dynamic>?>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) =>
+                          TeacherOpenCheckinSheet(classId: widget.classId),
+                    );
+
+                if (!mounted) return;
+
+                if (created != null) {
+                  // 1) โชว์ทันที (optimistic)
+                  
+                  if (!mounted) return;
+                  await Future.delayed(const Duration(seconds: 2));
+                  insertOptimisticSession(created);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')),
+                  );
+                  await _refresh(force: true);
+                }
               },
               icon: const Icon(Icons.play_circle_outline),
               label: const Text('ประกาศเช็คชื่อ'),
@@ -289,7 +347,6 @@ class _StreamTabState extends State<_StreamTab> {
           Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
 
-          // ✅ ฟีดการ์ดแบบ Google Classroom
           FutureBuilder<List<FeedItem>>(
             future: _futureFeed,
             builder: (context, snap) {
@@ -312,6 +369,7 @@ class _StreamTabState extends State<_StreamTab> {
                 items: feed,
                 isTeacher: widget.isTeacher,
                 classId: widget.classId,
+               onChanged: () => _refresh(force: true),// เปลี่ยนเป็น force ทุกครั้ง
               );
             },
           ),

@@ -7,24 +7,44 @@ import 'auth_service.dart';
 
 class FeedService {
   /// รวบรวมฟีดของคลาส: เช็คชื่อ / งาน / ประกาศ แล้ว sort ตามเวลาโพสต์
-  static Future<List<FeedItem>> getClassFeed(String classId) async {
+  static Future<List<FeedItem>> getClassFeed(
+    String classId, {
+    bool force = false,
+  }) async {
     final items = <FeedItem>[];
 
-    // 1) ดึง Session เช็คชื่อที่กำลังเปิด (จาก AttendanceService)
     try {
-      final sessions = await AttendanceService.getActiveSessions();
-      for (final s in sessions) {
-        if ((s['class_id']?.toString() ?? '') != classId) continue;
+      // ⬅️ ส่ง force ต่อไป
+      final sessions = await AttendanceService.getActiveSessions(force: force);
 
-        // fields ที่ฝั่งคุณส่งมา: session_id, expires_at, radius_meters, anchor_lat, anchor_lon
-        final id = s['session_id']?.toString() ?? '';
+      String? _classIdOf(Map<String, dynamic> s) {
+        final v1 = s['class_id'];
+        if (v1 is String && v1.isNotEmpty) return v1;
+        final v2 = s['classId'];
+        if (v2 is String && v2.isNotEmpty) return v2;
+        final c = s['class'] as Map<String, dynamic>?;
+        if (c != null) {
+          final v3 = c['class_id'] ?? c['id'];
+          if (v3 is String && v3.isNotEmpty) return v3;
+        }
+        return null;
+      }
+
+      for (final s in sessions) {
+        if ((_classIdOf(s)?.toLowerCase().trim()) !=
+            classId.toLowerCase().trim())
+          continue;
+
+        final id = s['session_id']?.toString() ?? s['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+
+        final start = DateTime.tryParse(s['start_time']?.toString() ?? '');
         final expires = DateTime.tryParse(
           s['end_time']?.toString() ?? s['expires_at']?.toString() ?? '',
         );
-        // ในที่นี้ให้ postedAt = now - 1min (เพราะ backend ไม่ส่ง start_time ก็ได้)
+
         final postedAt =
-            DateTime.tryParse(s['start_time']?.toString() ?? '') ??
-            DateTime.now().subtract(const Duration(minutes: 1));
+            start ?? DateTime.now().subtract(const Duration(minutes: 1));
 
         items.add(
           FeedItem(
@@ -35,6 +55,8 @@ class FeedService {
             postedAt: postedAt,
             expiresAt: expires,
             extra: {
+              'session_id': id,
+              'reverify_enabled': s['reverify_enabled'] == true,
               'radius': s['radius_meters'],
               'anchor_lat': s['anchor_lat'],
               'anchor_lon': s['anchor_lon'],
@@ -44,15 +66,7 @@ class FeedService {
       }
     } catch (_) {}
 
-    // 2) TODO: ดึง "ประกาศ" ของคลาส (ตัวอย่าง wire จุดเดียวไว้)
-    // final anns = await AnnouncementService.listByClass(classId);
-    // items.addAll(anns.map((a) => FeedItem(... type: FeedType.announcement ...)));
-
-    // 3) TODO: ดึง "งาน" ของคลาส
-    // final works = await AssignmentService.listByClass(classId);
-
-    // เรียงตามเวลาโพสต์ จากใหม่ไปเก่า
-    items.sort((a, b) => (b.postedAt).compareTo(a.postedAt));
+    items.sort((a, b) => b.postedAt.compareTo(a.postedAt));
     return items;
   }
 }

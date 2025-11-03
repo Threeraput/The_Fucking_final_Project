@@ -1,7 +1,9 @@
 // lib/screens/teacher_open_checkin_sheet.dart
 import 'package:flutter/material.dart';
-import '../services/attendance_service.dart';
+// ใช้ SessionsService ให้ตรงกับส่วนอื่นของแอป
+import 'package:frontend/services/sessions_service.dart';
 import '../utils/location_helper.dart';
+import 'package:frontend/services/attendance_service.dart';
 
 class TeacherOpenCheckinSheet extends StatefulWidget {
   final String classId;
@@ -14,9 +16,7 @@ class TeacherOpenCheckinSheet extends StatefulWidget {
 
 class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
   final _minCtl = TextEditingController(text: '15');
-  final _lateCtl = TextEditingController(
-    text: '10',
-  ); // 👈 เพิ่มช่อง Late Cutoff (นาที)
+  final _lateCtl = TextEditingController(text: '10'); // เวลาตัดสาย (นาที)
   final _radiusCtl = TextEditingController(text: '100');
   final _formKey = GlobalKey<FormState>();
   bool _posting = false;
@@ -24,7 +24,7 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
   @override
   void dispose() {
     _minCtl.dispose();
-    _lateCtl.dispose(); // 👈 dispose ด้วย
+    _lateCtl.dispose();
     _radiusCtl.dispose();
     super.dispose();
   }
@@ -37,11 +37,9 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     return null;
   }
 
-  // ใช้ validator สำหรับ late cutoff ที่ต้องไม่เกิน minutes
   String? _lateCutoffValidator(String? v) {
     final base = _requiredInt(v, min: 1, max: 1440);
     if (base != null) return base;
-
     final minutes = int.tryParse(_minCtl.text.trim());
     final cutoff = int.tryParse(v!.trim());
     if (minutes != null && cutoff != null && cutoff > minutes) {
@@ -50,17 +48,16 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     return null;
   }
 
-  Future<void> _open() async {
+ Future<void> _open() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final minutes = int.parse(_minCtl.text.trim()); // เช่น 60
-    final cutoff = int.parse(_lateCtl.text.trim()); // เช่น 10
+    final minutes = int.parse(_minCtl.text.trim());
+    final cutoff = int.parse(_lateCtl.text.trim());
     final radius = int.parse(_radiusCtl.text.trim());
 
-    // กันกรณีที่มีการแก้ไขค่าแล้ว validator ไม่จับทัน
     if (cutoff > minutes) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เวลาตัดสายต้องไม่เกินเวลาหมดอายุ')),
+        const SnackBar(content: Text('เวลาตัดสายต้องไม่เกินเวลาหมดอายุ')),
       );
       return;
     }
@@ -69,20 +66,99 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     try {
       final pos = await LocationHelper.getCurrentPositionOrThrow();
 
-      await AttendanceService.openSession(
+      // เรียกเปิด session (ได้ AttendanceSession กลับมา)
+      final s = await AttendanceService.openSession(
         classId: widget.classId,
-        expiresInMinutes: minutes, // ใช้เวลาหมดอายุรวม
+        expiresInMinutes: minutes,
         radiusMeters: radius,
         latitude: pos.latitude,
         longitude: pos.longitude,
-        lateCutoffMinutes: cutoff, // 👈 ส่ง cutoff ไปด้วย
+        lateCutoffMinutes: cutoff,
       );
 
       if (!mounted) return;
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('ประกาศเช็คชื่อสำเร็จ')));
+
+      // ✅ แปลงเป็น Map ส่งกลับไปให้หน้าแม่ทำ optimistic UI
+      // (พยายามใส่ทั้งคีย์ที่ FeedService/ActiveSessionsBanner รองรับ)
+      final created = <String, dynamic>{
+        'session_id':
+            ( /* ถ้าโมเดลมี field id */ (() {
+              try {
+                return (s as dynamic).id?.toString();
+              } catch (_) {
+                return null;
+              }
+            })()) ??
+            '',
+        'id': (() {
+          try {
+            return (s as dynamic).id?.toString();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'class_id': widget.classId,
+        'start_time': (() {
+          try {
+            return (s as dynamic).startTime?.toIso8601String();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'end_time': (() {
+          try {
+            return (s as dynamic).endTime?.toIso8601String();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'expires_at': (() {
+          // เผื่อฝั่งแสดงผลดู expires_at
+          try {
+            return (s as dynamic).endTime?.toIso8601String();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'reverify_enabled': (() {
+          try {
+            return (s as dynamic).reverifyEnabled == true;
+          } catch (_) {
+            return false;
+          }
+        })(),
+        'radius_meters': (() {
+          try {
+            return (s as dynamic).radiusMeters;
+          } catch (_) {
+            return radius;
+          }
+        })(),
+        'anchor_lat': (() {
+          try {
+            return (s as dynamic).anchorLat;
+          } catch (_) {
+            return pos.latitude;
+          }
+        })(),
+        'anchor_lon': (() {
+          try {
+            return (s as dynamic).anchorLon;
+          } catch (_) {
+            return pos.longitude;
+          }
+        })(),
+      };
+
+      // ถ้าไม่มี id เลย ให้ fallback เป็นเวลาเพื่อไม่ให้การ์ดหลุด (ยังไงก็จะ refresh ทับภายหลัง)
+      if ((created['session_id']?.toString().isEmpty ?? true) &&
+          (created['id']?.toString().isEmpty ?? true)) {
+        created['session_id'] =
+            '${widget.classId}-${DateTime.now().millisecondsSinceEpoch}';
+      }
+
+      // ส่ง Map กลับไป (แทน true) เพื่อให้หน้าแม่ insertOptimisticSession()
+      Navigator.of(context).pop(created);
     } catch (e) {
       if (!mounted) return;
       // ignore: avoid_print

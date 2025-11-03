@@ -1,7 +1,7 @@
 # backend/app/api/v1/attendance.py
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Path, Body
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Path, Body, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -240,3 +240,31 @@ def toggle_reverify(req: ToggleReverifyRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(s)
     return ToggleReverifyResponse(ok=True, reverify_enabled=s.reverify_enabled)
+
+
+@router.get("/my-status")
+def my_status(
+    session_id: uuid.UUID = Query(..., description="Attendance session id"),
+    db: Session = Depends(get_db),
+    me = Depends(get_current_user),
+):
+    """
+    คืนสถานะว่านักเรียนคนปัจจุบัน 'เคยเช็คชื่อ' ใน session นี้หรือยัง
+    """
+    att = (
+        db.query(Attendance)
+        .filter(
+            Attendance.session_id == session_id,
+            Attendance.student_id == me.user_id,
+        )
+        .first()
+    )
+    if not att:
+        return {"has_checked_in": False}
+
+    return {
+        "has_checked_in": True,
+        "attendance_id": str(att.attendance_id),
+        "status": getattr(att, "status", None),  # ถ้ามี enum สถานะ
+        "checked_at": getattr(att, "check_in_time", None).isoformat() if getattr(att, "check_in_time", None) else None,
+    }
