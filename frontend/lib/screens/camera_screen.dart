@@ -384,38 +384,38 @@ Future<void> _captureAndProcess() async {
 
                     // ปุ่มข้าม (เฉพาะอำนวยความสะดวก)
                     if (!widget.isVerificationMode)
-                      // Positioned(
-                      //   top: 40,
-                      //   right: 16,
-                      //   child: ElevatedButton(
-                      //     style: ElevatedButton.styleFrom(
-                      //       backgroundColor: Colors.black54,
-                      //       padding: const EdgeInsets.symmetric(
-                      //         horizontal: 16,
-                      //         vertical: 10,
-                      //       ),
-                      //       shape: RoundedRectangleBorder(
-                      //         borderRadius: BorderRadius.circular(20),
-                      //       ),
-                      //     ),
-                      //     onPressed: () {
-                      //       Navigator.pushReplacement(
-                      //         context,
-                      //         MaterialPageRoute(
-                      //           builder: (_) => const ClassroomHomeScreen(),
-                      //         ),
-                      //       );
-                      //     },
-                      //     child: const Text(
-                      //       'ข้าม',
-                      //       style: TextStyle(
-                      //         color: Colors.white,
-                      //         fontSize: 16,
-                      //         fontWeight: FontWeight.bold,
-                      //       ),
-                      //     ),
-                      //   ),
-                      // ),
+                      Positioned(
+                        top: 40,
+                        right: 16,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black54,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ClassroomHomeScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'ข้าม',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
 
                     // ปุ่มถ่ายภาพ
                     Align(
