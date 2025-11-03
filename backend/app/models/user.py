@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from app.database import Base
 from app.models.association import user_roles, class_students # ตรวจสอบว่า import class_students ด้วย
 from app.models.attendance_session import AttendanceSession
+from app.models.classwork import Classwork # เพิ่ม import
 
 class User(Base):
     __tablename__ = "users"
@@ -59,5 +60,10 @@ class User(Base):
     enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
     # เพิ่มความสัมพันธ์สำหรับการเป็นผู้สอน/ผู้ประกาศ
     attendance_sessions = relationship("AttendanceSession", back_populates="teacher", cascade="all, delete-orphan")
+    # ความสัมพันธ์สำหรับการส่งงาน (Student)
+    class_submissions = relationship("Classwork", foreign_keys="[Classwork.student_id]", back_populates="student_rel", cascade="all, delete-orphan")
+   # ความสัมพันธ์สำหรับการสร้างงาน (Teacher)
+    class_assignments = relationship("Classwork", foreign_keys="[Classwork.teacher_id]", back_populates="teacher_rel", cascade="all, delete-orphan")
+   
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"
