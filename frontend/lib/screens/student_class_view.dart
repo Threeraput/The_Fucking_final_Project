@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:frontend/models/feed_item.dart';
 import 'package:frontend/screens/student_reverify_screen.dart';
+import 'package:frontend/services/feed_service.dart';
 import 'package:frontend/utils/location_helper.dart';
+import 'package:frontend/widgets/feed_cards.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
@@ -84,7 +87,7 @@ class _StudentClassViewState extends State<StudentClassView> {
 
 final color = getClassColor('Example Class'); // ตัวอย่างการใช้ฟังก์ชัน
 
-class _StudentStreamTab extends StatelessWidget {
+class _StudentStreamTab extends StatefulWidget {
   final String classId;
   final String className;
   final String teacherName;
@@ -95,47 +98,96 @@ class _StudentStreamTab extends StatelessWidget {
   });
 
   @override
+  State<_StudentStreamTab> createState() => _StudentStreamTabState();
+}
+
+class _StudentStreamTabState extends State<_StudentStreamTab> {
+  late Future<List<FeedItem>> _futureFeed;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureFeed = FeedService.getClassFeed(widget.classId);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _futureFeed = FeedService.getClassFeed(widget.classId);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          color: getClassColor(className), // ใช้ฟังก์ชันใหม่
-          elevation: 3,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(className, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 8),
-                Text('Teacher: $teacherName'),
-              ],
+    final className = widget.className;
+    final teacherName = widget.teacherName;
+    final classId = widget.classId;
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Header การ์ดห้องเรียน
+          Card(
+            color: getClassColor(className),
+            elevation: 3,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    className,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Teacher: $teacherName'),
+                ],
+              ),
             ),
           ),
-        ),
 
-        // 🔹 แสดง Active Sessions สำหรับคลาสนี้
-       
-        const SizedBox(height: 12),
-        ActiveSessionsBanner(
-          classId: classId,
-          isTeacherView: false, // หน้านักเรียน
-        ),
+          const SizedBox(height: 12),
 
-        const SizedBox(height: 16),
-        Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        const Card(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('No announcements yet.'),
+          // แบนเนอร์เช็คชื่อที่กำลังเปิด (นักเรียน)
+   //ActiveSessionsBanner(classId: classId, isTeacherView: false),
+
+          const SizedBox(height: 16),
+          Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+
+          // ✅ ใช้ฟีดจริง แทนการ์ด "No announcements yet."
+          FutureBuilder<List<FeedItem>>(
+            future: _futureFeed,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snap.hasError) {
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('โหลดฟีดไม่สำเร็จ: ${snap.error}'),
+                  ),
+                );
+              }
+              final feed = snap.data ?? const <FeedItem>[];
+              return FeedList(
+                items: feed,
+                isTeacher: false, // ✅ นักเรียน
+                classId: classId,
+                onChanged: _refresh, // กด action ในการ์ดให้รีเฟรชได้
+              );
+            },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
