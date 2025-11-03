@@ -100,42 +100,54 @@ class _JoinClassSheetState extends State<JoinClassSheet> {
           ),
           const SizedBox(height: 16),
           Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    TextField(
-      controller: _codeCtl,
-      decoration: InputDecoration(
-        labelText: 'รหัสคลาส',
-        border: const OutlineInputBorder(),
-        errorText: _errorText,
-      ),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')), // เฉพาะตัวเลขและอังกฤษ
-        UpperCaseTextFormatter(), // แปลงเป็นพิมพ์ใหญ่
-      ],
-    ),
-    const SizedBox(height: 8),
-    Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Text('• รหัสต้องเป็นตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น', style: TextStyle(color: Colors.grey, fontSize: 13)),
-        SizedBox(height: 4),
-        Text('• ห้ามใช้สัญลักษณ์พิเศษหรือเว้นวรรค', style: TextStyle(color: Colors.grey, fontSize: 13)),
-        SizedBox(height: 4),
-        Text('• ตัวอักษรทั้งหมดต้องเป็นตัวพิมพ์ใหญ่', style: TextStyle(color: Colors.grey, fontSize: 13)),
-        SizedBox(height: 4),
-        Text('• ห้ามใช้ตัวอักษรภาษาไทยหรือภาษาต่างประเทศอื่น ๆ', style: TextStyle(color: Colors.grey, fontSize: 13)),
-      ],
-    ),
-  ],
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _codeCtl,
+                decoration: InputDecoration(
+                  labelText: 'รหัสคลาส',
+                  border: const OutlineInputBorder(),
+                  errorText: _errorText,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'[a-zA-Z0-9]'),
+                  ), // เฉพาะตัวเลขและอังกฤษ
+                  UpperCaseTextFormatter(), // แปลงเป็นพิมพ์ใหญ่
+                ],
+              ),
+              const SizedBox(height: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    '• รหัสต้องเป็นตัวอักษรภาษาอังกฤษและตัวเลขเท่านั้น',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• ห้ามใช้สัญลักษณ์พิเศษหรือเว้นวรรค',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• ตัวอักษรทั้งหมดต้องเป็นตัวพิมพ์ใหญ่',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• ห้ามใช้ตัวอักษรภาษาไทยหรือภาษาต่างประเทศอื่น ๆ',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                  backgroundColor: Colors.blueAccent
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Colors.blueAccent),
               icon: _loading
                   ? const SizedBox(
                       width: 18,

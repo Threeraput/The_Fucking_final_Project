@@ -1,11 +1,13 @@
 # backend/app/api/v1/attendance.py
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Path, Body
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Path, Body, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.user import User
-from app.models.attendance import Attendance  # <-- Add this import
+from app.models.attendance import Attendance
+from app.models.attendance_session import AttendanceSession
 from app.schemas.attendance_schema import (
     AttendanceCheckIn,
     AttendanceResponse,
@@ -13,11 +15,15 @@ from app.schemas.attendance_schema import (
     StudentLocationLogCreate,
     AttendanceManualOverride,
     ReverifyRequest, 
+      # <-- Add this import
 )
+from app.schemas.session_schema import SessionResponse
+from app.schemas.reverify_schema import ToggleReverifyRequest, ToggleReverifyResponse
 # ใช้อันเดียวให้ตรงทั้งโปรเจกต์
 from app.core.deps import get_current_user  # <- ถ้าคุณใช้ของ core.deps อยู่ที่อื่น
 from app.services.attendance_service import record_check_in , handle_reverification , manual_override_attendance
 from app.services.location_service import update_teacher_location_log, log_student_location
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -206,3 +212,59 @@ async def override_attendance_status(
         return AttendanceResponse.model_validate(record, from_attributes=True)  # Pydantic v2
     except Exception:
         return AttendanceResponse.from_orm(record)  # fallback Pydantic v1
+    
+
+@router.get("/sessions/active", response_model=List[SessionResponse])
+def list_active_sessions(db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    qs = (
+        db.query(AttendanceSession)
+        .filter(AttendanceSession.start_time <= now, AttendanceSession.end_time >= now)
+        .order_by(AttendanceSession.start_time.desc())
+        .all()
+    )
+    return qs  # Pydantic จะ serialize รวม reverify_enabled ให้เอง
+
+@router.post("/re-verify/toggle", response_model=ToggleReverifyResponse)
+def toggle_reverify(req: ToggleReverifyRequest, db: Session = Depends(get_db)):
+    s = db.query(AttendanceSession).filter_by(session_id=req.session_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    now = datetime.now(timezone.utc)
+    # ใช้เวลาเดียวกับ session: เปิดได้เฉพาะช่วงที่ session ยัง active
+    if req.enabled and not (s.start_time <= now <= s.end_time):
+        raise HTTPException(status_code=400, detail="Session is not active")
+
+    s.reverify_enabled = req.enabled
+    db.commit()
+    db.refresh(s)
+    return ToggleReverifyResponse(ok=True, reverify_enabled=s.reverify_enabled)
+
+
+@router.get("/my-status")
+def my_status(
+    session_id: uuid.UUID = Query(..., description="Attendance session id"),
+    db: Session = Depends(get_db),
+    me = Depends(get_current_user),
+):
+    """
+    คืนสถานะว่านักเรียนคนปัจจุบัน 'เคยเช็คชื่อ' ใน session นี้หรือยัง
+    """
+    att = (
+        db.query(Attendance)
+        .filter(
+            Attendance.session_id == session_id,
+            Attendance.student_id == me.user_id,
+        )
+        .first()
+    )
+    if not att:
+        return {"has_checked_in": False}
+
+    return {
+        "has_checked_in": True,
+        "attendance_id": str(att.attendance_id),
+        "status": getattr(att, "status", None),  # ถ้ามี enum สถานะ
+        "checked_at": getattr(att, "check_in_time", None).isoformat() if getattr(att, "check_in_time", None) else None,
+    }

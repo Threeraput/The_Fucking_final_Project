@@ -1,8 +1,9 @@
 // lib/screens/teacher_open_checkin_sheet.dart
 import 'package:flutter/material.dart';
-import 'package:numberpicker/numberpicker.dart';
-import '../services/attendance_service.dart';
+// ใช้ SessionsService ให้ตรงกับส่วนอื่นของแอป
+import 'package:frontend/services/sessions_service.dart';
 import '../utils/location_helper.dart';
+import 'package:frontend/services/attendance_service.dart';
 
 class TeacherOpenCheckinSheet extends StatefulWidget {
   final String classId;
@@ -15,6 +16,7 @@ class TeacherOpenCheckinSheet extends StatefulWidget {
 
 class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
   final _minCtl = TextEditingController(text: '15');
+  final _lateCtl = TextEditingController(text: '10'); // เวลาตัดสาย (นาที)
   final _radiusCtl = TextEditingController(text: '100');
   final _formKey = GlobalKey<FormState>();
   bool _posting = false;
@@ -22,6 +24,7 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
   @override
   void dispose() {
     _minCtl.dispose();
+    _lateCtl.dispose();
     _radiusCtl.dispose();
     super.dispose();
   }
@@ -34,37 +37,132 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     return null;
   }
 
-  Future<void> _open() async {
+  String? _lateCutoffValidator(String? v) {
+    final base = _requiredInt(v, min: 1, max: 1440);
+    if (base != null) return base;
+    final minutes = int.tryParse(_minCtl.text.trim());
+    final cutoff = int.tryParse(v!.trim());
+    if (minutes != null && cutoff != null && cutoff > minutes) {
+      return 'ต้องไม่เกินเวลาหมดอายุ (${minutes} นาที)';
+    }
+    return null;
+  }
+
+ Future<void> _open() async {
     if (!_formKey.currentState!.validate()) return;
 
     final minutes = int.parse(_minCtl.text.trim());
+    final cutoff = int.parse(_lateCtl.text.trim());
     final radius = int.parse(_radiusCtl.text.trim());
+
+    if (cutoff > minutes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เวลาตัดสายต้องไม่เกินเวลาหมดอายุ')),
+      );
+      return;
+    }
 
     setState(() => _posting = true);
     try {
-      // 1) อ่าน GPS ก่อน เพื่อส่งไปกับ openSession (backend ต้องการ)
       final pos = await LocationHelper.getCurrentPositionOrThrow();
 
-      // 2) เปิด session พร้อม latitude/longitude
-      await AttendanceService.openSession(
+      // เรียกเปิด session (ได้ AttendanceSession กลับมา)
+      final s = await AttendanceService.openSession(
         classId: widget.classId,
         expiresInMinutes: minutes,
         radiusMeters: radius,
-        latitude: pos.latitude, // 👈 ใหม่
-        longitude: pos.longitude, // 👈 ใหม่
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        lateCutoffMinutes: cutoff,
       );
 
-      // 3) ไม่ต้องเรียก updateTeacherAnchor แล้ว (ลบทิ้ง)
-      // await AttendanceService.updateTeacherAnchor(...);  // ❌ ลบ
-
       if (!mounted) return;
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('ประกาศเช็คชื่อสำเร็จ')));
+
+      // ✅ แปลงเป็น Map ส่งกลับไปให้หน้าแม่ทำ optimistic UI
+      // (พยายามใส่ทั้งคีย์ที่ FeedService/ActiveSessionsBanner รองรับ)
+      final created = <String, dynamic>{
+        'session_id':
+            ( /* ถ้าโมเดลมี field id */ (() {
+              try {
+                return (s as dynamic).id?.toString();
+              } catch (_) {
+                return null;
+              }
+            })()) ??
+            '',
+        'id': (() {
+          try {
+            return (s as dynamic).id?.toString();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'class_id': widget.classId,
+        'start_time': (() {
+          try {
+            return (s as dynamic).startTime?.toIso8601String();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'end_time': (() {
+          try {
+            return (s as dynamic).endTime?.toIso8601String();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'expires_at': (() {
+          // เผื่อฝั่งแสดงผลดู expires_at
+          try {
+            return (s as dynamic).endTime?.toIso8601String();
+          } catch (_) {
+            return null;
+          }
+        })(),
+        'reverify_enabled': (() {
+          try {
+            return (s as dynamic).reverifyEnabled == true;
+          } catch (_) {
+            return false;
+          }
+        })(),
+        'radius_meters': (() {
+          try {
+            return (s as dynamic).radiusMeters;
+          } catch (_) {
+            return radius;
+          }
+        })(),
+        'anchor_lat': (() {
+          try {
+            return (s as dynamic).anchorLat;
+          } catch (_) {
+            return pos.latitude;
+          }
+        })(),
+        'anchor_lon': (() {
+          try {
+            return (s as dynamic).anchorLon;
+          } catch (_) {
+            return pos.longitude;
+          }
+        })(),
+      };
+
+      // ถ้าไม่มี id เลย ให้ fallback เป็นเวลาเพื่อไม่ให้การ์ดหลุด (ยังไงก็จะ refresh ทับภายหลัง)
+      if ((created['session_id']?.toString().isEmpty ?? true) &&
+          (created['id']?.toString().isEmpty ?? true)) {
+        created['session_id'] =
+            '${widget.classId}-${DateTime.now().millisecondsSinceEpoch}';
+      }
+
+      // ส่ง Map กลับไป (แทน true) เพื่อให้หน้าแม่ insertOptimisticSession()
+      Navigator.of(context).pop(created);
     } catch (e) {
       if (!mounted) return;
-      print('🧩 [TeacherOpenCheckinSheet] error: $e'); // ไว้debugต่อ
+      // ignore: avoid_print
+      print('🧩 [TeacherOpenCheckinSheet] error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
@@ -73,7 +171,6 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
     }
   }
 
-  
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
@@ -98,89 +195,35 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
+
+            // หมดอายุใน (นาที)
             TextFormField(
-              readOnly: true,
               controller: _minCtl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'หมดอายุใน (นาที)',
                 border: OutlineInputBorder(),
-                helperText: 'เช่น 15 นาที',
-                suffixIcon: Icon(Icons.timer_outlined),
+                helperText: 'เช่น 15, 30, 60 นาที',
               ),
-              onTap: () async {
-              int currentValue = int.tryParse(_minCtl.text) ?? 15;
-              int tempValue = currentValue;
-
-await showModalBottomSheet(
-  context: context,
-  isScrollControlled: true,
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-  ),
-  builder: (context) {
-    
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        top: 16,
-        left: 16,
-        right: 16,
-      ),
-      child: StatefulBuilder(
-        builder: (context, setModalState) {
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('เลือกเวลาหมดอายุ (นาที)',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 180,
-                child: NumberPicker(
-                  value: tempValue,
-                  minValue: 1,
-                  maxValue: 240,
-                  onChanged: (val) => setModalState(() => tempValue = val),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      style: TextStyle(color: Colors.grey),
-                      'ยกเลิก'),
-                  ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                    ),
-                    onPressed: () {
-                      setState(() => _minCtl.text = tempValue.toString());
-                      Navigator.pop(context);
-                    },
-                    child: const Text('ตกลง'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
-          );
-        },
-      ),
-    );
-  },
-);
-
-
-              },
               validator: (v) => _requiredInt(v, min: 1, max: 240),
             ),
-            
             const SizedBox(height: 12),
+
+            // เวลาตัดสาย (นาทีหลังเริ่ม)
+            TextFormField(
+              controller: _lateCtl,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'เวลาตัดสาย (นาทีหลังเริ่ม)',
+                border: const OutlineInputBorder(),
+                helperText:
+                    'เช่น 10 นาที (ต้องไม่เกินเวลาหมดอายุ ${_minCtl.text} นาที)',
+              ),
+              validator: _lateCutoffValidator,
+            ),
+            const SizedBox(height: 12),
+
+            // รัศมี (เมตร)
             TextFormField(
               controller: _radiusCtl,
               keyboardType: TextInputType.number,
@@ -191,19 +234,17 @@ await showModalBottomSheet(
               ),
               validator: (v) => _requiredInt(v, min: 10, max: 2000),
             ),
+
             const SizedBox(height: 16),
             FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(44),
-              ),
               onPressed: _posting ? null : _open,
               icon: const Icon(Icons.play_circle_outline),
               label: _posting
                   ? const Text('กำลังเปิด...')
                   : const Text('เริ่มเช็คชื่อ'),
-              
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+              ),
             ),
           ],
         ),

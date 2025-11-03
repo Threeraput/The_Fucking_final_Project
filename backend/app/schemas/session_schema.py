@@ -42,6 +42,7 @@ class SessionResponse(BaseModel):
     radius_meters: int
     anchor_lat: float
     anchor_lon: float
+    reverify_enabled: bool = False
     
     class Config:
         from_attributes = True
