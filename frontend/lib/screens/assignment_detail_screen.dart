@@ -125,7 +125,7 @@ Future<void> _loadUsersIfNeeded() async {
 
   /// ✅ ฟังก์ชัน normalize URL (แก้ให้มี http:// และตัด static ออก)
   String _resolveFileUrl(String relativePath) {
-    const base = 'http://192.168.0.200:8000'; // ✅ ใส่ http:// ด้วย
+    const base = 'http://172.20.10.2:8000'; // ✅ ใส่ http:// ด้วย
     var path = relativePath.trim();
 
     // ถ้าเป็น URL เต็มแล้ว ก็ส่งกลับเลย

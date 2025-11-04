@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:frontend/models/users.dart';
 import 'package:frontend/models/classroom.dart';
-import 'package:frontend/screens/profile_screen.dart';
+// import 'package:frontend/screens/profile_screen.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
 import 'class_details_screen.dart';
@@ -107,13 +107,13 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               accountName: Text(me.username ?? 'ไม่ทราบชื่อ'),
               accountEmail: Text(me.email ?? ''),
               currentAccountPicture: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ProfilePage(user: me),
-                    ),
-                  );
-                },
+                // onTap: () {
+                //   Navigator.of(context).push(
+                //     MaterialPageRoute(
+                //       builder: (context) => ProfilePage(user: me),
+                //     ),
+                //   );
+                // },
                 child: CircleAvatar(
                   backgroundColor: Colors.deepOrangeAccent,
                   child: Text(
@@ -440,18 +440,18 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Classroom'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            tooltip: 'Profile',
-            onPressed: () {
-              // นำทางไปหน้า Profile
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => ProfilePage(user: me!)),
-              );
-            },
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.person),
+        //     tooltip: 'Profile',
+        //     onPressed: () {
+        //       // นำทางไปหน้า Profile
+        //       Navigator.of(context).push(
+        //         MaterialPageRoute(builder: (context) => ProfilePage(user: me!)),
+        //       );
+        //     },
+        //   ),
+        // ],
       ),
       drawer: _buildDrawer(),
       floatingActionButton: FloatingActionButton(
