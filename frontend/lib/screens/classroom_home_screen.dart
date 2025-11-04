@@ -565,7 +565,7 @@ class _EmptyState extends StatelessWidget {
             Icon(
               Icons.class_,
               size: 64,
-              color: Theme.of(context).colorScheme.primary,
+              color: Colors.blueAccent, 
             ),
             const SizedBox(height: 12),
             Text(title, style: Theme.of(context).textTheme.titleLarge),
