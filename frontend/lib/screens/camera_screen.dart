@@ -326,7 +326,9 @@ Future<void> _captureAndProcess() async {
                 MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
               );
             },
-            child: const Text('OK'),
+            child: const Text(
+              style: TextStyle(color: Colors.black54),
+              'OK'),
           ),
         ],
       ),

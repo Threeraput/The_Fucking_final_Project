@@ -20,6 +20,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   String? _message;
   bool _isLoading = false;
 
+  Color? _messageColor;
+
   @override
   void initState() {
     super.initState();
@@ -63,11 +65,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     _message = null;
   });
 
+
   try {
     await AuthService.verifyOtp(widget.email, otp);
 
     setState(() {
       _message = 'OTP verified successfully! Your account is now active.';
+      _messageColor = Colors.green;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -247,7 +251,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
                     _message!,
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(color: _messageColor),
                     textAlign: TextAlign.center,
                   ),
                 ),
