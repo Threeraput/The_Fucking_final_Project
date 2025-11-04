@@ -416,7 +416,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                       ],
                     ),
                   );
-
                   if (confirmed == true) {
                     await AuthService.logout();
                     if (context.mounted) {

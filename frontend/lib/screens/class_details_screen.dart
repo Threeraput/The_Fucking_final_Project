@@ -78,22 +78,41 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
         context: context,
         builder: (_) => AlertDialog(
           title: const Text('เปิดเช็คชื่อต่อเลยไหม?'),
-          content: const Text(
-            'คุณเพิ่งประกาศแล้ว ต้องการเปิด session เช็คชื่อสำหรับคลาสนี้ตอนนี้เลยหรือไม่',
+          content: RichText(
+            text: TextSpan(
+              style: TextStyle(color: Colors.black, fontSize: 16),
+              children: [
+                TextSpan(text: 'คุณเพิ่งประกาศแล้ว '),
+                TextSpan(
+                  text: 'ต้องการเปิด session เช็คชื่อ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                TextSpan(text: ' สำหรับคลาสนี้ตอนนี้เลยหรือไม่'),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('ภายหลัง'),
+              child: const Text(
+                style: TextStyle(color: Colors.grey),
+                'ภายหลัง',
+              ),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent, // สีพื้นหลัง
+              ),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('เปิดเลย'),
             ),
           ],
         ),
       );
-     if (wantOpen == true) {
+      if (wantOpen == true) {
         final opened = await showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
@@ -284,7 +303,8 @@ class _StreamTabState extends State<_StreamTab> {
                   children: [
                     Text(
                       c.name ?? '—',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
@@ -336,11 +356,11 @@ class _StreamTabState extends State<_StreamTab> {
 
                 if (created != null) {
                   // 1) โชว์ทันที (optimistic)
-                  
+
                   if (!mounted) return;
                   await Future.delayed(const Duration(seconds: 2));
                   insertOptimisticSession(created);
-                  
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')),
                   );
@@ -378,7 +398,8 @@ class _StreamTabState extends State<_StreamTab> {
                 items: feed,
                 isTeacher: widget.isTeacher,
                 classId: widget.classId,
-               onChanged: () => _refresh(force: true),// เปลี่ยนเป็น force ทุกครั้ง
+                onChanged: () =>
+                    _refresh(force: true), // เปลี่ยนเป็น force ทุกครั้ง
               );
             },
           ),
