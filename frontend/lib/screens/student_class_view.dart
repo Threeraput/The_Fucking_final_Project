@@ -64,23 +64,26 @@ class _StudentClassViewState extends State<StudentClassView> {
   }
 
   Widget _buildBody() {
-    switch (_currentIndex) {
-      case 0:
-        return _StudentStreamTab(
-          classId: widget.classId,
-          className: widget.className,
-          teacherName: widget.teacherName,
-        );
-      case 1:
-        return _StudentClassworkTab(classId: widget.classId);
-      case 2:
-        return const _StudentReportTab();
-      case 3:
-        return _StudentPeopleTab(teacherName: widget.teacherName);
-      default:
-        return const SizedBox.shrink();
-    }
+  switch (_currentIndex) {
+    case 0:
+      return _StudentStreamTab(
+        classId: widget.classId,
+        className: widget.className,
+        teacherName: widget.teacherName,
+      );
+    case 1:
+      //  เปลี่ยนจาก const _StudentClassworkTab() -> ส่ง classId และ isTeacher=false
+      return StudentClassworkTab(
+        classId: widget.classId,
+      );
+    case 2:
+      return const _StudentReportTab();
+    case 3:
+      return _StudentPeopleTab(teacherName: widget.teacherName);
+    default:
+      return const SizedBox.shrink();
   }
+}
 }
 
 /// ======================
@@ -106,12 +109,16 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
   @override
   void initState() {
     super.initState();
-    _futureFeed = FeedService.getClassFeed(widget.classId);
+    _futureFeed = FeedService.getClassFeedForStudentWithAssignments(
+      widget.classId,
+    );
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _futureFeed = FeedService.getClassFeed(widget.classId);
+        _futureFeed = FeedService.getClassFeedForStudentWithAssignments(
+        widget.classId,
+      );
     });
   }
 
@@ -193,26 +200,34 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
 /// ======================
 /// 🔹 CLASSWORK TAB (งาน/Assignment)
 /// ======================
-class _StudentClassworkTab extends StatefulWidget {
+class StudentClassworkTab extends StatefulWidget {
   final String classId;
-  const _StudentClassworkTab({required this.classId});
+  final bool isTeacher; // เผื่อไว้ ถ้าอยาก reuse โค้ด
+  const StudentClassworkTab({
+    super.key,
+    required this.classId,
+    this.isTeacher = false,
+  });
 
   @override
-  State<_StudentClassworkTab> createState() => _StudentClassworkTabState();
+  State<StudentClassworkTab> createState() => _StudentClassworkTabState();
 }
 
-class _StudentClassworkTabState extends State<_StudentClassworkTab> {
-  late Future<List<FeedItem>> _futureAssignments;
+class _StudentClassworkTabState extends State<StudentClassworkTab> {
+  late Future<List<FeedItem>> _future;
 
   @override
   void initState() {
     super.initState();
-    _futureAssignments = FeedService.getClassFeed(widget.classId);
+    // ✅ โหลดเฉพาะ feed ที่เหมาะกับนักเรียน (รวม assignments)
+    _future = FeedService.getClassFeedForStudentWithAssignments(widget.classId);
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _futureAssignments = FeedService.getClassFeed(widget.classId);
+      _future = FeedService.getClassFeedForStudentWithAssignments(
+        widget.classId,
+      );
     });
   }
 
@@ -220,42 +235,51 @@ class _StudentClassworkTabState extends State<_StudentClassworkTab> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: FutureBuilder<List<FeedItem>>(
-        future: _futureAssignments,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
-          }
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('Classwork', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          FutureBuilder<List<FeedItem>>(
+            future: _future,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snap.hasError) {
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('โหลดงานไม่สำเร็จ: ${snap.error}'),
+                  ),
+                );
+              }
+              final items = (snap.data ?? const <FeedItem>[])
+                  // ✅ แสดงเฉพาะการ์ด assignment ในแท็บ Classwork
+                  .where((f) => (f.extra['kind']?.toString() == 'assignment'))
+                  .toList();
 
-          final feed = snap.data ?? [];
-          // ✅ กรองเฉพาะ feed ที่เป็น assignment
-          final assignments = feed
-              .where((f) => (f.extra['kind'] ?? '') == 'assignment')
-              .toList();
+              if (items.isEmpty) {
+                return const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('ยังไม่มีงานในชั้นเรียนนี้'),
+                  ),
+                );
+              }
 
-          if (assignments.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text('ยังไม่มีงานในคลาสนี้'),
-              ),
-            );
-          }
-
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            child: FeedList(
-              items: assignments,
-              isTeacher: false,
-              classId: widget.classId,
-              onChanged: _refresh,
-            ),
-          );
-        },
+              return FeedList(
+                items: items,
+                isTeacher: widget.isTeacher, // false สำหรับนักเรียน
+                classId: widget.classId,
+                onChanged: _refresh,
+              );
+            },
+          ),
+        ],
       ),
     );
   }
