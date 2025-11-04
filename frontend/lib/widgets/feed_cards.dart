@@ -1,14 +1,14 @@
-// lib/widgets/feed_cards.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import '../models/feed_item.dart';
 import '../screens/student_checkin_screen.dart';
 import 'package:frontend/services/sessions_service.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/utils/location_helper.dart';
+import 'package:frontend/services/announcement_service.dart';
 
-// ✅ เพิ่ม import สำหรับการ์ดงาน (assignment)
+
+// ✅ การ์ด assignment
 import 'package:frontend/widgets/assignment_card.dart';
 
 class FeedList extends StatelessWidget {
@@ -26,7 +26,7 @@ class FeedList extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+Widget build(BuildContext context) {
     if (items.isEmpty) {
       return Card(
         margin: const EdgeInsets.only(top: 8),
@@ -42,8 +42,43 @@ class FeedList extends StatelessWidget {
       );
     }
 
+    // ✅ เรียงลำดับใหม่ให้ "โพสต์ล่าสุดอยู่บนสุด"
+    final now = DateTime.now().toUtc();
+
+    final sortedItems = List<FeedItem>.from(items)
+      ..sort((a, b) {
+        final aKind = a.extra['kind']?.toString();
+        final bKind = b.extra['kind']?.toString();
+
+        final aIsCheckin = a.type == FeedType.checkin || aKind == 'checkin';
+        final bIsCheckin = b.type == FeedType.checkin || bKind == 'checkin';
+
+        //  เช็คชื่อทั้งหมดอยู่บนสุด
+        if (aIsCheckin != bIsCheckin) return aIsCheckin ? -1 : 1;
+
+        //  ถ้าเป็นเช็คชื่อทั้งคู่ — ยังไม่หมดเวลาอยู่ก่อน
+        if (aIsCheckin && bIsCheckin) {
+          final aExpired = a.expiresAt != null && a.expiresAt!.isBefore(now);
+          final bExpired = b.expiresAt != null && b.expiresAt!.isBefore(now);
+          if (aExpired != bExpired) return aExpired ? 1 : -1;
+        }
+
+        //  ถ้าเป็นประกาศทั้งคู่ → pinned มาก่อน
+        final aIsAnn = aKind == 'announcement';
+        final bIsAnn = bKind == 'announcement';
+        if (aIsAnn && bIsAnn) {
+          final ap = a.extra['pinned'] == true;
+          final bp = b.extra['pinned'] == true;
+          if (ap != bp) return bp ? 1 : -1;
+        }
+
+        //  สุดท้ายเรียงตามเวลาใหม่สุด
+        return b.postedAt.compareTo(a.postedAt);
+      });
+
+    //  วนลูปสร้างการ์ดตามลำดับใหม่
     return Column(
-      children: items
+      children: sortedItems
           .map(
             (e) => _FeedCard(
               item: e,
@@ -70,15 +105,21 @@ class _FeedCard extends StatelessWidget {
     this.onChanged,
   });
 
-@override
+  @override
   Widget build(BuildContext context) {
-    // ✅ ป้องกัน extra เป็น null หรือไม่ใช่ Map
     final extra = Map<String, dynamic>.from(item.extra ?? {});
-
-    // ✅ แยกชนิดการ์ด (ไม่สนตัวพิมพ์ใหญ่เล็ก)
     final kind = (extra['kind']?.toString().toLowerCase() ?? '');
 
-    switch (kind) {
+    // ✅ ถ้า backend ยังไม่ใส่ kind ให้ใช้ item.type เป็น fallback
+    final effectiveKind = kind.isEmpty
+        ? switch (item.type) {
+            FeedType.assignment => 'assignment',
+            FeedType.announcement => 'announcement',
+            _ => '',
+          }
+        : kind;
+
+    switch (effectiveKind) {
       case 'assignment':
         return AssignmentCard(
           classId: classId,
@@ -88,15 +129,29 @@ class _FeedCard extends StatelessWidget {
           onChanged: onChanged,
         );
 
-      // ✅ สามารถขยายในอนาคต เช่น case 'announcement', 'quiz' ได้
+   case 'announcement':
+        // 🔹 strip prefix "ann:" ออก ถ้ามี
+        final rawId = item.id ?? '';
+        final annId = rawId.startsWith('ann:') ? rawId.split(':').last : rawId;
+
+        return _AnnouncementCard(
+          title: item.title.isNotEmpty ? item.title : 'ประกาศ',
+          body: (extra['body'] ?? '') as String,
+          postedAt: item.postedAt,
+          pinned: extra['pinned'] == true,
+          author: (extra['author_name'] ?? '') as String,
+          expiresAt: item.expiresAt,
+          announcementId: annId, //  ส่ง UUID แบบเพียว ๆ
+          isTeacher: isTeacher,
+          onChanged: onChanged,
+        );
+
       default:
-        // ✅ ค่าเริ่มต้น: การ์ดเช็คชื่อ (เดิม)
         return _buildCheckinCard(context);
     }
   }
 
-
-  /// ===== การ์ดเช็คชื่อ (เดิม) =====
+  /// ===== การ์ดเช็คชื่อ =====
   Widget _buildCheckinCard(BuildContext context) {
     final dfTime = DateFormat('d MMM, HH:mm');
     final expText = item.expiresAt != null
@@ -107,16 +162,14 @@ class _FeedCard extends StatelessWidget {
     final lat = item.extra['anchor_lat']?.toString();
     final lon = item.extra['anchor_lon']?.toString();
 
-    // ข้อมูลสำหรับ reverify
     final sessionId = item.extra['session_id']?.toString();
     final reverifyEnabled = item.extra['reverify_enabled'] == true;
 
     final nowUtc = DateTime.now().toUtc();
-    final notExpired = (item.expiresAt != null)
-        ? item.expiresAt!.toUtc().isAfter(nowUtc)
-        : false;
+    final notExpired =
+        item.expiresAt != null && item.expiresAt!.toUtc().isAfter(nowUtc);
 
-    // ถ้าไม่มี sessionId → การ์ดแบบพื้นฐาน
+    // ไม่มี sessionId → แสดงการ์ดพื้นฐาน
     if (sessionId == null || sessionId.isEmpty) {
       return _baseCard(
         context: context,
@@ -135,7 +188,7 @@ class _FeedCard extends StatelessWidget {
       );
     }
 
-    // ถ้ามี sessionId → โหลดสถานะของผู้ใช้
+    // มี sessionId → โหลดสถานะนักเรียน
     return FutureBuilder<Map<String, dynamic>>(
       future: AttendanceService.getMyStatusForSession(sessionId),
       builder: (context, snap) {
@@ -146,11 +199,7 @@ class _FeedCard extends StatelessWidget {
           );
         }
 
-        Map<String, dynamic> status = {};
-        if (snap.hasData && snap.data is Map<String, dynamic>) {
-          status = snap.data!;
-        }
-
+        final status = snap.data ?? {};
         final hasCheckedIn = status['has_checked_in'] == true;
         final canReverifyFlag = status['can_reverify'] == true;
         final canReverify = canReverifyFlag || (reverifyEnabled && notExpired);
@@ -174,7 +223,7 @@ class _FeedCard extends StatelessWidget {
     );
   }
 
-  /// ============ การ์ดพื้นฐาน ============
+  /// ===== การ์ดพื้นฐาน =====
   Widget _baseCard({
     required BuildContext context,
     required String title,
@@ -226,7 +275,7 @@ class _FeedCard extends StatelessWidget {
     );
   }
 
-  /// ปุ่มฝั่งครู/นักเรียน (เฉพาะการ์ดเช็คชื่อ)
+  /// ===== ปุ่มของนักเรียน / ครู =====
   Widget _studentOrTeacherButtons({
     required BuildContext context,
     required String? sessionId,
@@ -234,14 +283,14 @@ class _FeedCard extends StatelessWidget {
     required bool canReverify,
   }) {
     if (isTeacher) {
-      // ปุ่มสำหรับครู: toggle reverify
       return OutlinedButton(
-        onPressed: (sessionId != null)
-            ? () async {
+        onPressed: sessionId == null
+            ? null
+            : () async {
                 try {
                   final next = !(item.extra['reverify_enabled'] == true);
                   final enabled = await SessionsService.toggleReverify(
-                    sessionId: sessionId!,
+                    sessionId: sessionId,
                     enabled: next,
                   );
                   if (context.mounted) {
@@ -261,8 +310,7 @@ class _FeedCard extends StatelessWidget {
                     );
                   }
                 }
-              }
-            : null,
+              },
         child: Text(
           item.extra['reverify_enabled'] == true
               ? 'ปิด reverify'
@@ -271,8 +319,8 @@ class _FeedCard extends StatelessWidget {
       );
     }
 
-    // นักเรียน
     if (sessionId == null) return const SizedBox.shrink();
+
     final buttons = <Widget>[];
 
     // ปุ่มเช็คชื่อ
@@ -376,6 +424,197 @@ class _HeaderRow extends StatelessWidget {
         ),
         Text(dateText, style: Theme.of(context).textTheme.bodySmall),
       ],
+    );
+  }
+}
+
+class _AnnouncementCard extends StatelessWidget {
+  final String title;
+  final String body;
+  final DateTime postedAt;
+  final DateTime? expiresAt;
+  final bool pinned;
+  final String author;
+  final String announcementId;
+  final bool isTeacher;
+  final VoidCallback? onChanged;
+
+  const _AnnouncementCard({
+    required this.title,
+    required this.body,
+    required this.postedAt,
+    required this.pinned,
+    required this.author,
+    required this.announcementId,
+    required this.isTeacher,
+    this.expiresAt,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final df = DateFormat('d MMM, HH:mm');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _HeaderRow(
+              icon: pinned ? Icons.push_pin : Icons.campaign_outlined,
+              title: pinned ? '[ปักหมุด] $title' : title,
+              dateText: df.format(postedAt.toLocal()),
+            ),
+            if (author.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'โดย: $author',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            if (body.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(body),
+              ),
+            if (expiresAt != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'หมดอายุ: ${df.format(expiresAt!.toLocal())}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+
+            // 🔹 เพิ่มปุ่มแก้ไข / ลบ สำหรับครูเท่านั้น
+            if (isTeacher)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      tooltip: 'แก้ไขประกาศ',
+                      onPressed: () async {
+                        final titleCtrl = TextEditingController(text: title);
+                        final bodyCtrl = TextEditingController(text: body);
+
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('แก้ไขประกาศ'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextField(
+                                  controller: titleCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'หัวข้อ',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: bodyCtrl,
+                                  maxLines: 4,
+                                  decoration: const InputDecoration(
+                                    labelText: 'เนื้อหา',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('ยกเลิก'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('บันทึก'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (ok == true) {
+                          try {
+                            await AnnouncementService.update(
+                              announcementId: announcementId,
+                              title: titleCtrl.text,
+                              body: bodyCtrl.text,
+                            );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('อัปเดตประกาศสำเร็จ'),
+                                ),
+                              );
+                            }
+                            onChanged?.call();
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('อัปเดตไม่สำเร็จ: $e')),
+                              );
+                            }
+                          }
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'ลบประกาศ',
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('ยืนยันการลบ'),
+                            content: const Text(
+                              'คุณแน่ใจหรือไม่ที่จะลบประกาศนี้?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('ยกเลิก'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text(
+                                  'ลบ',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (ok == true) {
+                          try {
+                            await AnnouncementService.delete(announcementId);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('ลบประกาศสำเร็จ')),
+                              );
+                            }
+                            onChanged?.call();
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('ลบไม่สำเร็จ: $e')),
+                              );
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

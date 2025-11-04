@@ -63,53 +63,25 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
     }
   }
 
-  void _openCreateAnnouncement() async {
-    final ok = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CreateAnnouncementScreen(
-          classId: widget.classId,
-          className: _classroom?.name ?? widget.className ?? 'Class',
-        ),
+  Future<void> _openCreateAnnouncement() async {
+  final ok = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CreateAnnouncementScreen(
+        classId: widget.classId,
+        className: _classroom?.name ?? widget.className ?? 'Class',
       ),
+    ),
+  );
+
+  // ✅ ถ้าโพสต์สำเร็จ แค่รีเฟรชฟีดพอ ไม่ต้องถามเปิดเช็คชื่อ
+  if (ok == true && mounted) {
+    _streamKey.currentState?.refreshFeed();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('สร้างประกาศสำเร็จ')),
     );
-
-    if (ok == true && _isTeacher && mounted) {
-      final wantOpen = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('เปิดเช็คชื่อต่อเลยไหม?'),
-          content: const Text(
-            'คุณเพิ่งประกาศแล้ว ต้องการเปิด session เช็คชื่อสำหรับคลาสนี้ตอนนี้เลยหรือไม่',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('ภายหลัง'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('เปิดเลย'),
-            ),
-          ],
-        ),
-      );
-
-      if (wantOpen == true) {
-        final opened = await showModalBottomSheet<bool>(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => TeacherOpenCheckinSheet(classId: widget.classId),
-        );
-        if (opened == true && mounted) {
-          _streamKey.currentState?.refreshFeed();
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')));
-        }
-      }
-    }
   }
+}
 
   @override
   Widget build(BuildContext context) {

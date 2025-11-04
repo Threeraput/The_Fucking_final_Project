@@ -6,6 +6,7 @@ import 'package:frontend/services/class_service.dart';
 import 'package:frontend/services/classwork_simple_service.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import "../services/auth_service.dart"; 
 
 class AssignmentDetailScreen extends StatefulWidget {
   final String assignmentId;
@@ -33,10 +34,10 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     _future = ClassworkSimpleService.getSubmissionsForAssignment(
       widget.assignmentId,
     );
-     _loadUsersIfNeeded();
+    _loadUsersIfNeeded();
   }
 
-Future<void> _loadUsersIfNeeded() async {
+  Future<void> _loadUsersIfNeeded() async {
     if (widget.classId == null) return; // ไม่มี classId ก็ข้าม
     try {
       final Classroom cls = await ClassService.getClassroomDetails(
@@ -52,7 +53,6 @@ Future<void> _loadUsersIfNeeded() async {
     }
   }
 
-
   String _displayName(String studentId) {
     final u = _userIndex[studentId];
     if (u != null) {
@@ -64,6 +64,7 @@ Future<void> _loadUsersIfNeeded() async {
     }
     return studentId;
   }
+
   Future<void> _refresh() async {
     setState(() {
       _future = ClassworkSimpleService.getSubmissionsForAssignment(
@@ -98,7 +99,7 @@ Future<void> _loadUsersIfNeeded() async {
     }
   }
 
-  /// ✅ ฟังก์ชันเปิดไฟล์ PDF ที่แน่ใจว่า URL ถูกต้อง 100%
+  ///  ฟังก์ชันเปิดไฟล์ PDF ที่แน่ใจว่า URL ถูกต้อง 100%
   Future<void> _openSubmissionFile(String urlOrPath) async {
     final resolvedUrl = _resolveFileUrl(urlOrPath);
     final uri = Uri.tryParse(resolvedUrl);
@@ -106,7 +107,7 @@ Future<void> _loadUsersIfNeeded() async {
     print('🧩 Raw: $urlOrPath');
     print('✅ Fixed: $resolvedUrl');
 
-    // ✅ ถ้า URL ถูกต้อง (http/https) ให้เปิดทันที
+    //  ถ้า URL ถูกต้อง (http/https) ให้เปิดทันที
     if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
       try {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -122,10 +123,9 @@ Future<void> _loadUsersIfNeeded() async {
     }
   }
 
-
-  /// ✅ ฟังก์ชัน normalize URL (แก้ให้มี http:// และตัด static ออก)
+  ///  ฟังก์ชัน normalize URL (แก้ให้มี http:// และตัด static ออก)
   String _resolveFileUrl(String relativePath) {
-    const base = 'http://192.168.0.200:8000'; // ✅ ใส่ http:// ด้วย
+    const base = 'http://192.168.0.200:8000'; //  ใส่ http:// ด้วย
     var path = relativePath.trim();
 
     // ถ้าเป็น URL เต็มแล้ว ก็ส่งกลับเลย
