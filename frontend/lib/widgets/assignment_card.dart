@@ -54,13 +54,11 @@ class AssignmentCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer,
+                  backgroundColor: Colors.lightBlue[300],
                   child: Icon(
                     Icons.assignment_outlined,
                     size: 18,
-                    color: Theme.of(context).colorScheme.inverseSurface,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -102,13 +100,19 @@ class AssignmentCard extends StatelessWidget {
               )
             else
               Align(
-                alignment: Alignment.centerRight,
+                alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
-                  icon: const Icon(Icons.list_alt_outlined),
-                  label: const Text('ดูการส่งของนักเรียน'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.lightBlue[300],
+                    side: BorderSide.none
+                  ),
+                  label: const Text(
+                    style: TextStyle(color: Colors.white),
+                    'ดูการส่งของนักเรียน',
+                  ),
                   onPressed: () {
                     // ไปหน้า detail ของอาจารย์
-                   Navigator.pushNamed(
+                    Navigator.pushNamed(
                       context,
                       '/assignment-detail',
                       arguments: {
@@ -182,15 +186,32 @@ class _StudentSubmitButtonState extends State<_StudentSubmitButton> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('ยืนยันการส่งใหม่'),
-        content: const Text(
-          'คุณได้ส่งงานแล้ว ต้องการส่งไฟล์ใหม่ทับของเดิมหรือไม่?',
+        content: RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 16,
+              height: 1.4,
+            ),
+            children: [
+              const TextSpan(text: 'คุณได้ส่งงานแล้ว ต้องการส่งไฟล์ใหม่'),
+              TextSpan(
+                text: ' ทับของเดิมหรือไม่?',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.redAccent, // 🔴 เน้นสีแดงให้เตือนชัด ๆ
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
+            child: const Text(style: TextStyle(color: Colors.grey), 'ยกเลิก'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.blueAccent),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('ส่งใหม่'),
           ),
@@ -214,21 +235,35 @@ class _StudentSubmitButtonState extends State<_StudentSubmitButton> {
 
     if (!widget.alreadySubmitted) {
       // ยังไม่ส่ง → ปุ่มสีหลัก
-      return FilledButton.icon(
-        icon: const Icon(Icons.picture_as_pdf_outlined),
-        label: const Text('ส่ง PDF'),
-        onPressed: _pickAndSubmit,
+
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.lightBlue[300]
+          ),
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          label: const Text(
+            style: TextStyle(
+              color: Colors.white
+            ),
+            'ส่ง PDF'),
+          onPressed: _pickAndSubmit,
+        ),
       );
     } else {
       // ส่งแล้ว → ปุ่มสีเทา แสดงว่า "ส่งแล้ว" แต่ยังกดได้ (จะขึ้นยืนยันก่อนส่งใหม่)
-      return OutlinedButton.icon(
-        icon: const Icon(Icons.check_circle),
-        label: const Text('ส่งแล้ว'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Theme.of(context).disabledColor,
-          side: BorderSide(color: Theme.of(context).disabledColor),
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.check_circle),
+          label: const Text('ส่งแล้ว'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).disabledColor,
+            side: BorderSide(color: Theme.of(context).disabledColor),
+          ),
+          onPressed: _confirmResubmit,
         ),
-        onPressed: _confirmResubmit,
       );
     }
   }

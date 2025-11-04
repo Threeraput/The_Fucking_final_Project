@@ -5,7 +5,7 @@ import '../models/classroom.dart';
 import 'auth_service.dart' show AuthService; // ใช้เฉพาะ getAccessToken()
 
 //  ตั้ง BASE_URL ไว้ในไฟล์นี้ ไม่ต้อง import จาก auth_service.dart
-const String API_BASE_URL = 'http://172.20.10.2:8000/api/v1';
+const String API_BASE_URL = 'http://192.168.0.197:8000/api/v1';
 class ClassService {
   // ===== Headers + Error Handler =====
   static Future<Map<String, String>> _headers() async {

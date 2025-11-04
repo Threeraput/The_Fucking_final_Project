@@ -125,7 +125,7 @@ Future<void> _loadUsersIfNeeded() async {
 
   /// ✅ ฟังก์ชัน normalize URL (แก้ให้มี http:// และตัด static ออก)
   String _resolveFileUrl(String relativePath) {
-    const base = 'http://172.20.10.2:8000'; // ✅ ใส่ http:// ด้วย
+    const base = 'http://192.168.0.197:8000'; // ✅ ใส่ http:// ด้วย
     var path = relativePath.trim();
 
     // ถ้าเป็น URL เต็มแล้ว ก็ส่งกลับเลย
@@ -178,51 +178,128 @@ Future<void> _loadUsersIfNeeded() async {
                 );
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: ListTile(
-                    title: Text('นักเรียน: ${_displayName(s.studentId)}'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (s.submittedAt != null)
-                          Text('ส่งเมื่อ: ${df.format(s.submittedAt!)}'),
-                        Text('สถานะ: ${s.submissionStatus.name}'),
-                        if (s.contentUrl != null)
-                          TextButton(
-                            onPressed: () => _openSubmissionFile(s.contentUrl!),
-                            child: const Text('เปิดไฟล์งานที่ส่ง'),
-                          ),
-                      ],
-                    ),
-                    trailing: SizedBox(
-                      width: 120,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: c,
-                              decoration: const InputDecoration(
-                                labelText: 'คะแนน',
-                                border: OutlineInputBorder(),
-                              ),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.save),
-                            onPressed: () {
-                              _saveScore(
-                                assignmentId: widget.assignmentId,
-                                studentId: s.studentId,
-                                score: c.text,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+  elevation: 2,
+  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+  ),
+  child: Padding(
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 🧑‍🎓 ชื่อผู้เรียน
+        Text(
+          'นักเรียน: ${_displayName(s.studentId)}',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // 🕒 วันที่ส่ง
+        if (s.submittedAt != null)
+          Text.rich(
+            TextSpan(
+              text: 'ส่งเมื่อ: ',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              children: [
+                TextSpan(
+                  text: df.format(s.submittedAt!),
+                  style: const TextStyle(fontWeight: FontWeight.normal),
+                ),
+              ],
+            ),
+          ),
+
+        // 📋 สถานะ
+        Text.rich(
+          TextSpan(
+            text: 'สถานะ: ',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+            children: [
+              TextSpan(
+                text: s.submissionStatus.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: s.submissionStatus.name == 'ส่งแล้ว'
+                      ? Colors.green
+                      : Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 📁 ปุ่มเปิดไฟล์
+        if (s.contentUrl != null)
+          FilledButton.tonal(
+            onPressed: () => _openSubmissionFile(s.contentUrl!),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.blue.shade50,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.file_open_outlined, color: Colors.blueAccent),
+                SizedBox(width: 6),
+                Text(
+                  'เปิดไฟล์งานที่ส่ง',
+                  style: TextStyle(color: Colors.blueAccent),
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 12),
+
+        // 🧮 ส่วนให้คะแนน
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: c,
+                decoration: InputDecoration(
+                  labelText: 'คะแนน',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              icon: const Icon(Icons.save, color: Colors.white),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                padding: const EdgeInsets.all(14),
+              ),
+              onPressed: () {
+                _saveScore(
+                  assignmentId: widget.assignmentId,
+                  studentId: s.studentId,
+                  score: c.text,
                 );
+              },
+            ),
+          ],
+        ),
+      ],
+    ),
+  ),
+);
+
               },
             );
           },
