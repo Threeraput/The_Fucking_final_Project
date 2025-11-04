@@ -59,5 +59,9 @@ class User(Base):
     enrolled_classes = relationship("Class", secondary=class_students, back_populates="students")
     # เพิ่มความสัมพันธ์สำหรับการเป็นผู้สอน/ผู้ประกาศ
     attendance_sessions = relationship("AttendanceSession", back_populates="teacher", cascade="all, delete-orphan")
+    # ความสัมพันธ์สำหรับการส่งงาน (Student)
+    class_assignments = relationship("ClassworkAssignment", back_populates="teacher", cascade="all, delete-orphan")
+    class_submissions = relationship("ClassworkSubmission", back_populates="student", cascade="all, delete-orphan")
+   
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"

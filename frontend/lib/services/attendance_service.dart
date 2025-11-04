@@ -334,4 +334,26 @@ class AttendanceService {
       throw Exception('Override failed [${res.statusCode}]: ${res.body}');
     }
   }
+
+  static Future<bool> getIsReverified(String sessionId) async {
+    final res = await http.get(
+      Uri.parse('$API_BASE_URL/attendance/is-reverified/$sessionId'),
+      headers: await _headersWithAuth(),
+    );
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return data['is_reverified'] == true;
+    } else {
+      return false;
+    }
+  }
+
+  static Future<Map<String, String>> _headersWithAuth() async {
+    final token = await AuthService.getAccessToken();
+    if (token == null) throw Exception('Not authenticated');
+    return {
+      HttpHeaders.authorizationHeader: 'Bearer $token',
+      HttpHeaders.acceptHeader: 'application/json',
+    };
+  }
 }

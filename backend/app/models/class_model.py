@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
 from app.models.association import class_students # ต้อง import ตารางเชื่อมความสัมพันธ์
+from app.models.classwork_assignment import ClassworkAssignment
 
 class Class(Base):
     __tablename__ = "classes"
@@ -27,6 +28,8 @@ class Class(Base):
     attendances = relationship("Attendance", back_populates="class_rel", cascade="all, delete-orphan")
     teacher_location_logs = relationship("TeacherLocation", back_populates="classroom", cascade="all, delete-orphan")
     student_location_logs = relationship("StudentLocation", back_populates="classroom", cascade="all, delete-orphan")
+    # เพิ่ม Relationship สำหรับ Classwork
+    assignments = relationship("ClassworkAssignment", back_populates="classroom", cascade="all, delete-orphan")
     def __repr__(self):
         return f"<Class(name='{self.name}')>"
 

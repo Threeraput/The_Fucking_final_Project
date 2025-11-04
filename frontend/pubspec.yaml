@@ -48,8 +48,8 @@ dependencies:
   geolocator: ^14.0.2
   intl: ^0.20.2
   numberpicker: ^2.1.1
-  image_picker: ^0.8.7+5
-  
+  file_picker: ^10.3.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

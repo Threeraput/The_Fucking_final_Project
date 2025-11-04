@@ -1,50 +1,50 @@
 // lib/services/feed_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:frontend/services/classwork_simple_service.dart';
+import 'package:frontend/models/classwork.dart';
 import '../models/feed_item.dart';
 import 'attendance_service.dart';
-import 'auth_service.dart';
+
+/// Helper เล็กๆ: แปลงค่าจาก backend เป็น boolean
+bool _truthy(Map<String, dynamic>? m, List<String> keys) {
+  if (m == null) return false;
+  for (final k in keys) {
+    final v = m[k];
+    if (v == true) return true;
+    if (v is String) {
+      final s = v.toLowerCase();
+      if (s == 'true' || s == 'passed' || s == 'completed' || s == 'ok') {
+        return true;
+      }
+    }
+    if (v is Map && (v['passed'] == true || v['completed'] == true)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 class FeedService {
-  /// รวบรวมฟีดของคลาส: เช็คชื่อ / งาน / ประกาศ แล้ว sort ตามเวลาโพสต์
-  static Future<List<FeedItem>> getClassFeed(
-    String classId, {
-    bool force = false,
-  }) async {
+  /// ✅ ดึงฟีดพื้นฐาน (เช็คชื่อ)
+  static Future<List<FeedItem>> getClassFeed(String classId) async {
     final items = <FeedItem>[];
 
     try {
-      // ⬅️ ส่ง force ต่อไป
-      final sessions = await AttendanceService.getActiveSessions(force: force);
-
-      String? _classIdOf(Map<String, dynamic> s) {
-        final v1 = s['class_id'];
-        if (v1 is String && v1.isNotEmpty) return v1;
-        final v2 = s['classId'];
-        if (v2 is String && v2.isNotEmpty) return v2;
-        final c = s['class'] as Map<String, dynamic>?;
-        if (c != null) {
-          final v3 = c['class_id'] ?? c['id'];
-          if (v3 is String && v3.isNotEmpty) return v3;
-        }
-        return null;
-      }
-
+      final sessions = await AttendanceService.getActiveSessions();
       for (final s in sessions) {
-        if ((_classIdOf(s)?.toLowerCase().trim()) !=
-            classId.toLowerCase().trim())
-          continue;
+        if ((s['class_id']?.toString() ?? '') != classId) continue;
 
         final id = s['session_id']?.toString() ?? s['id']?.toString() ?? '';
         if (id.isEmpty) continue;
 
-        final start = DateTime.tryParse(s['start_time']?.toString() ?? '');
         final expires = DateTime.tryParse(
           s['end_time']?.toString() ?? s['expires_at']?.toString() ?? '',
         );
 
         final postedAt =
-            start ?? DateTime.now().subtract(const Duration(minutes: 1));
+            DateTime.tryParse(s['start_time']?.toString() ?? '') ??
+            DateTime.now().subtract(const Duration(minutes: 1));
 
         items.add(
           FeedItem(
@@ -64,8 +64,128 @@ class FeedService {
           ),
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      print('⚠️ โหลด session feed ไม่สำเร็จ: $e');
+    }
 
+    // ✅ ต่อท้ายด้วย assignments (สำหรับครู)
+    try {
+      final asgs =
+          await ClassworkSimpleService.listAssignmentsForClassAsTeacherTyped(
+            classId,
+          );
+      for (final a in asgs) {
+        items.add(
+          FeedItem(
+            id: 'asg:${a.assignmentId}',
+            classId: classId,
+            type: FeedType.assignment,
+            title: 'งาน: ${a.title}',
+            postedAt: a.createdAt,
+            expiresAt: a.dueDate,
+            extra: {
+              'kind': 'assignment',
+              'assignment_id': a.assignmentId,
+              'title': a.title,
+              'due_date': a.dueDate.toIso8601String(),
+              'max_score': a.maxScore,
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      print('⚠️ โหลด assignments (ครู) ไม่สำเร็จ: $e');
+    }
+
+    // ✅ เรียงจากใหม่ไปเก่า
+    items.sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return items;
+  }
+
+  /// ✅ ฟีดสำหรับนักเรียน (เช็คชื่อ + งาน)
+  static Future<List<FeedItem>> getClassFeedForStudentWithAssignments(
+    String classId,
+  ) async {
+    final result = <FeedItem>[];
+
+    // 1. เอาฟีดเช็คชื่อที่ยังไม่ยืนยันครบ
+    final checkins = await getClassFeed(classId);
+    for (final f in checkins) {
+      if (f.type != FeedType.checkin) {
+        result.add(f);
+        continue;
+      }
+      final sid = f.extra['session_id']?.toString();
+      if (sid == null || sid.isEmpty) {
+        result.add(f);
+        continue;
+      }
+
+      try {
+        final status = await AttendanceService.getMyStatusForSession(sid);
+        final hasCheckedIn = _truthy(status, [
+          'has_checked_in',
+          'checked_in',
+          'present',
+        ]);
+        final reverifyCompleted = _truthy(status, [
+          'reverify_completed',
+          'has_reverified',
+          'reverify_passed',
+          'reverified',
+        ]);
+
+        // 🔍 ซ่อนถ้าเช็คชื่อ + reverify แล้ว
+        if (!(hasCheckedIn && reverifyCompleted)) {
+          result.add(f);
+        }
+      } catch (_) {
+        result.add(f); // fallback ถ้าเรียกไม่สำเร็จ
+      }
+    }
+
+    // 2. เพิ่มงานของนักเรียน
+    try {
+      final list = await ClassworkSimpleService.getStudentAssignmentsTyped(
+        classId,
+      );
+      for (final v in list) {
+        final a = v.assignment;
+        result.add(
+          FeedItem(
+            id: 'asg:${a.assignmentId}',
+            classId: classId,
+            type: FeedType.assignment,
+            title: 'งาน: ${a.title}',
+            postedAt: a.createdAt,
+            expiresAt: a.dueDate,
+            extra: {
+              'kind': 'assignment',
+              'assignment_id': a.assignmentId,
+              'title': a.title,
+              'due_date': a.dueDate.toIso8601String(),
+              'max_score': a.maxScore,
+              'computed_status': latenessToString(v.computedStatus),
+              'my_submission': v.mySubmission?.toJson(),
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      print('⚠️ โหลด assignments (นักเรียน) ไม่สำเร็จ: $e');
+    }
+
+    result.sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return result;
+  }
+
+  /// ✅ ฟีดของครู (เช็คชื่อ + งาน)
+  static Future<List<FeedItem>> getClassFeedForTeacherWithAssignments(
+    String classId,
+  ) async {
+    final items = await getClassFeed(classId);
+
+    // (มี assignments แล้วใน getClassFeed อยู่แล้ว)
     items.sort((a, b) => b.postedAt.compareTo(a.postedAt));
     return items;
   }

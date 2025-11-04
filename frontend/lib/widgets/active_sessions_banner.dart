@@ -239,61 +239,76 @@ class _SessionRow extends StatelessWidget {
                     future: _hasCheckedIn(sessionId),
                     builder: (context, snap) {
                       final hasCheckedIn = snap.data == true;
-                      final nowUtc = DateTime.now().toUtc();
-                      final endStr =
-                          data['expires_at']?.toString() ??
-                          data['end_time']?.toString();
-                      final end = endStr != null
-                          ? DateTime.tryParse(endStr)
-                          : null;
-                      final notExpired =
-                          end != null && end.toUtc().isAfter(nowUtc);
 
-                      final canReverify =
-                          reverifyEnabled && notExpired && hasCheckedIn;
+                      // ✅ เรียกเช็ค reverify เพิ่มอีกชั้น
+                      return FutureBuilder<bool>(
+                        future: sessionId != null
+                            ? AttendanceService.getIsReverified(sessionId!)
+                            : Future.value(false),
+                        builder: (context, snap2) {
+                          final isReverified = snap2.data == true;
 
-                      return OutlinedButton.icon(
-                        icon: const Icon(Icons.verified_user_outlined),
-                        label: const Text('ยืนยันซ้ำ'),
-                        onPressed: (sessionId != null && canReverify)
-                            ? () async {
-                                try {
-                                  final result = await Navigator.pushNamed(
-                                    context,
-                                    '/reverify-face',
-                                  );
-                                  if (result == null ||
-                                      result is! String ||
-                                      result.isEmpty)
-                                    return;
+                          // เดิม: เปิดปุ่มเมื่อ reverifyEnabled && notExpired && hasCheckedIn
+                          // ใหม่: ถ้า isReverified แล้ว → ปิดปุ่มและเปลี่ยนข้อความ
+                          final canReverifyNow =
+                              reverifyEnabled &&
+                              notExpired &&
+                              hasCheckedIn &&
+                              !isReverified;
 
-                                  final pos =
-                                      await LocationHelper.getCurrentPositionOrThrow();
-                                  await AttendanceService.reVerify(
-                                    sessionId: sessionId!,
-                                    imagePath: result,
-                                    latitude: pos.latitude,
-                                    longitude: pos.longitude,
-                                  );
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('ยืนยันตัวตนซ้ำสำเร็จ'),
-                                      ),
-                                    );
+                          return OutlinedButton.icon(
+                            onPressed: (sessionId != null && canReverifyNow)
+                                ? () async {
+                                    try {
+                                      final result = await Navigator.pushNamed(
+                                        context,
+                                        '/reverify-face',
+                                      );
+                                      if (result == null ||
+                                          result is! String ||
+                                          result.isEmpty)
+                                        return;
+
+                                      final pos =
+                                          await LocationHelper.getCurrentPositionOrThrow();
+                                      await AttendanceService.reVerify(
+                                        sessionId: sessionId!,
+                                        imagePath: result,
+                                        latitude: pos.latitude,
+                                        longitude: pos.longitude,
+                                      );
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'ยืนยันตัวตนซ้ำสำเร็จ',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                      onChanged();
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text('เกิดข้อผิดพลาด: $e'),
+                                          ),
+                                        );
+                                      }
+                                    }
                                   }
-                                  onChanged();
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('เกิดข้อผิดพลาด: $e'),
-                                      ),
-                                    );
-                                  }
-                                }
-                              }
-                            : null,
+                                : null,
+                            icon: const Icon(Icons.verified_user_outlined),
+                            label: Text(
+                              isReverified ? 'ยืนยันแล้ว' : 'ยืนยันซ้ำ',
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

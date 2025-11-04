@@ -3,16 +3,17 @@ import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_announcement_screen.dart';
+import 'package:frontend/screens/teacher_open_checkin_sheet.dart';
 import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/services/class_service.dart';
-import 'package:frontend/screens/teacher_open_checkin_sheet.dart';
 import 'package:frontend/services/feed_service.dart';
 import 'package:frontend/widgets/feed_cards.dart';
 import 'package:frontend/models/feed_item.dart';
+import 'package:intl/intl.dart';
 
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
-  final String? className; // เผื่อส่งชื่อมาจาก Card
+  final String? className;
 
   const ClassDetailsScreen({super.key, required this.classId, this.className});
 
@@ -42,11 +43,12 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
       final isTeacher =
           me?.roles.contains('teacher') == true ||
           me?.roles.contains('admin') == true;
+
       Classroom? cls;
       if (isTeacher) {
-        // teacher/admin เข้าถึงรายละเอียดคลาสได้
         cls = await ClassService.getClassroomDetails(widget.classId);
       }
+
       setState(() {
         _me = me;
         _isTeacher = isTeacher;
@@ -72,7 +74,6 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
       ),
     );
 
-    // ✅ หลังประกาศ ถ้าเป็นครู ให้ถามว่าจะเปิดเช็คชื่อต่อเลยไหม
     if (ok == true && _isTeacher && mounted) {
       final wantOpen = await showDialog<bool>(
         context: context,
@@ -119,16 +120,13 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           builder: (_) => TeacherOpenCheckinSheet(classId: widget.classId),
         );
         if (opened == true && mounted) {
-          _streamKey.currentState
-              ?.refreshFeed(); // เรียกแบบ force ผ่านเมธอดนี้แล้ว
+          _streamKey.currentState?.refreshFeed();
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')));
         }
       }
     }
-
-    // TODO: ถ้ามี service ประกาศแล้ว ให้ refresh feed ได้ที่นี่
   }
 
   @override
@@ -141,20 +139,24 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           : _error
           ? const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'))
           : _buildBody(),
+      floatingActionButton: _currentIndex == 1 && _isTeacher
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.add),
+              label: const Text('เพิ่มงาน'),
+              onPressed: () async {
+                final ok = await Navigator.pushNamed(
+                  context,
+                  '/create-assignment',
+                  arguments: widget.classId,
+                );
+                if (ok == true) setState(() {}); // รีเฟรชหลังเพิ่มงาน
+              },
+            )
+          : null,
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color.fromARGB(
-          255,
-          255,
-          255,
-          255,
-        ), // 🔹 พื้นหลัง
-        selectedItemColor: Colors.blueAccent, // 🔹 สีไอคอนและข้อความที่เลือก
-        unselectedItemColor: const Color.fromARGB(
-          255,
-          39,
-          39,
-          39,
-        ), // 🔹 สีไอคอนที่ไม่ได้เลือก
+        backgroundColor: Colors.white,
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: const Color.fromARGB(255, 39, 39, 39),
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
@@ -185,13 +187,13 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
       case 0:
         return _StreamTab(
           key: _streamKey,
-          classId: widget.classId, // ✅ ส่ง classId เข้าไป
+          classId: widget.classId,
           classroom: _classroom,
           isTeacher: _isTeacher,
           onCreateAnnouncement: _openCreateAnnouncement,
         );
       case 1:
-        return const _ClassworkTab();
+        return _ClassworkTab(classId: widget.classId, isTeacher: _isTeacher);
       case 2:
         return const _ReportTab();
       case 3:
@@ -202,6 +204,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   }
 }
 
+/// 🔹 STREAM TAB
 class _StreamTab extends StatefulWidget {
   final String classId;
   final Classroom? classroom;
@@ -209,7 +212,7 @@ class _StreamTab extends StatefulWidget {
   final VoidCallback onCreateAnnouncement;
 
   const _StreamTab({
-    Key? key, // ✅ รับ key
+    Key? key,
     required this.classId,
     required this.classroom,
     required this.isTeacher,
@@ -222,8 +225,6 @@ class _StreamTab extends StatefulWidget {
 
 class _StreamTabState extends State<_StreamTab> {
   late Future<List<FeedItem>> _futureFeed;
-
-  // เก็บฟีดล่าสุดไว้ในหน่วยความจำ (เพื่อใส่การ์ดแบบทันที)
   List<FeedItem> _lastFeed = const [];
 
   @override
@@ -237,9 +238,9 @@ class _StreamTabState extends State<_StreamTab> {
 
   Future<void> _refresh({bool force = false}) async {
     setState(() {
-      _futureFeed = FeedService.getClassFeed(widget.classId, force: force).then(
+      _futureFeed = FeedService.getClassFeed(widget.classId, ).then(
         (list) {
-          _lastFeed = list; // sync state ในหน่วยความจำ
+          _lastFeed = list;
           return list;
         },
       );
@@ -248,7 +249,6 @@ class _StreamTabState extends State<_StreamTab> {
 
   void refreshFeed() => _refresh(force: true);
 
-  /// ใส่การ์ด session ใหม่แบบ optimistic (แสดงทันทีโดยไม่ต้องรูดรีเฟรช)
   void insertOptimisticSession(Map<String, dynamic> s) {
     final id = s['session_id']?.toString() ?? s['id']?.toString() ?? '';
     if (id.isEmpty) return;
@@ -275,8 +275,8 @@ class _StreamTabState extends State<_StreamTab> {
     );
 
     setState(() {
-      _lastFeed = [item, ..._lastFeed]; // ใส่บนสุด
-      _futureFeed = Future.value(_lastFeed); // ให้ FutureBuilder อัปเดตทันที
+      _lastFeed = [item, ..._lastFeed];
+      _futureFeed = Future.value(_lastFeed);
     });
   }
 
@@ -284,7 +284,6 @@ class _StreamTabState extends State<_StreamTab> {
   Widget build(BuildContext context) {
     final c = widget.classroom;
     return RefreshIndicator(
-      // รูดรีเฟรช -> เอาแบบ force กันแคชไปเลย
       onRefresh: () => _refresh(force: true),
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -324,8 +323,6 @@ class _StreamTabState extends State<_StreamTab> {
                 ),
               ),
             ),
-
-          // ปุ่มฝั่งครู
           if (widget.isTeacher) ...[
             const SizedBox(height: 12),
             ElevatedButton.icon(
@@ -355,12 +352,8 @@ class _StreamTabState extends State<_StreamTab> {
                 if (!mounted) return;
 
                 if (created != null) {
-                  // 1) โชว์ทันที (optimistic)
-
-                  if (!mounted) return;
-                  await Future.delayed(const Duration(seconds: 2));
+                  await Future.delayed(const Duration(seconds: 4));
                   insertOptimisticSession(created);
-
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')),
                   );
@@ -371,11 +364,9 @@ class _StreamTabState extends State<_StreamTab> {
               label: const Text('ประกาศเช็คชื่อ'),
             ),
           ],
-
           const SizedBox(height: 16),
           Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-
           FutureBuilder<List<FeedItem>>(
             future: _futureFeed,
             builder: (context, snap) {
@@ -398,8 +389,7 @@ class _StreamTabState extends State<_StreamTab> {
                 items: feed,
                 isTeacher: widget.isTeacher,
                 classId: widget.classId,
-                onChanged: () =>
-                    _refresh(force: true), // เปลี่ยนเป็น force ทุกครั้ง
+                onChanged: () => _refresh(force: true),
               );
             },
           ),
@@ -409,44 +399,95 @@ class _StreamTabState extends State<_StreamTab> {
   }
 }
 
-class _ClassworkTab extends StatelessWidget {
-  const _ClassworkTab();
+/// 🔹 CLASSWORK TAB (assignment)
+class _ClassworkTab extends StatefulWidget {
+  final String classId;
+  final bool isTeacher;
+  const _ClassworkTab({required this.classId, required this.isTeacher});
+
+  @override
+  State<_ClassworkTab> createState() => _ClassworkTabState();
+}
+
+class _ClassworkTabState extends State<_ClassworkTab> {
+  late Future<List<FeedItem>> _futureAssignments;
+
+  @override
+void initState() {
+    super.initState();
+    _futureAssignments = widget.isTeacher
+        ? FeedService.getClassFeedForTeacherWithAssignments(widget.classId)
+        : FeedService.getClassFeedForStudentWithAssignments(widget.classId);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _futureAssignments = widget.isTeacher
+          ? FeedService.getClassFeedForTeacherWithAssignments(widget.classId)
+          : FeedService.getClassFeedForStudentWithAssignments(widget.classId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // TODO: อาจารย์สร้างงาน/นักเรียนดูงาน-ส่งงาน เมื่อมี API พร้อม
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Classwork — สร้าง/ส่งงาน จะอยู่ที่นี่',
-          style: Theme.of(context).textTheme.bodyLarge,
-          textAlign: TextAlign.center,
-        ),
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: FutureBuilder<List<FeedItem>>(
+        future: _futureAssignments,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError) {
+            return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
+          }
+
+          final feed = snap.data ?? [];
+          final assignments = feed
+              .where((f) => (f.extra['kind'] ?? '') == 'assignment')
+              .toList();
+
+          if (assignments.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('ยังไม่มีงานในคลาสนี้'),
+              ),
+            );
+          }
+
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: FeedList(
+              items: assignments,
+              isTeacher: widget.isTeacher,
+              classId: widget.classId,
+              onChanged: _refresh,
+            ),
+          );
+        },
       ),
     );
   }
 }
 
+/// 🔹 REPORT TAB
 class _ReportTab extends StatelessWidget {
   const _ReportTab();
 
   @override
   Widget build(BuildContext context) {
-    // TODO: แสดงสถิติขาด/ลา/มาสายจาก API report
-    return Center(
+    return const Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Report — สถิติการเช็คชื่อ จะอยู่ที่นี่',
-          style: Theme.of(context).textTheme.bodyLarge,
-          textAlign: TextAlign.center,
-        ),
+        padding: EdgeInsets.all(24),
+        child: Text('Report — สถิติการเช็คชื่อ จะอยู่ที่นี่'),
       ),
     );
   }
 }
 
+/// 🔹 PEOPLE TAB
 class _PeopleTab extends StatelessWidget {
   final Classroom? classroom;
   const _PeopleTab({required this.classroom});

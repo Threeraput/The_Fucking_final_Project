@@ -4,7 +4,9 @@
 
 # Python environment files
 .env
+ีีuploads/
 
+workpdf/
 
 # Python bytecode
 *.pyc

@@ -1,7 +1,9 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:frontend/screens/assignment_detail_screen.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
+import 'package:frontend/screens/create_assignment_screen.dart';
 import 'package:frontend/screens/verify_face_route.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -132,13 +134,28 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: initialRoute,
       onGenerateRoute: _onGenerateRoute,
-      routes: {
+   routes: {
         //  verify-face สำหรับตรวจยืนยัน
         '/verify-face': (context) => const VerifyFaceRoute(),
 
         //  reverify-face สำหรับสุ่มตรวจซ้ำกลางคาบ
         '/reverify-face': (context) =>
             const VerifyFaceRoute(isReverifyMode: true),
+
+        // ✅ เพิ่มเส้นทางสร้างงานใหม่ (อยู่ใน routes เดียวกัน)
+        '/create-assignment': (context) {
+          final classId = ModalRoute.of(context)!.settings.arguments as String;
+          return CreateAssignmentScreen(classId: classId);
+        },
+
+        '/assignment-detail': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map;
+          return AssignmentDetailScreen(
+            assignmentId: args['assignmentId'],
+            title: args['title'] ?? 'Assignment',
+            classId: args['classId'],
+          );
+        },
       },
     );
   }

@@ -268,3 +268,27 @@ def my_status(
         "status": getattr(att, "status", None),  # ถ้ามี enum สถานะ
         "checked_at": getattr(att, "check_in_time", None).isoformat() if getattr(att, "check_in_time", None) else None,
     }
+    
+@router.get("/is-reverified/{session_id}")
+def get_is_reverified(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+     ตรวจสอบว่านักเรียนคนนี้ (current_user)
+    ได้ยืนยันตัวตนซ้ำ (is_reverified) แล้วหรือยัง ใน session ที่กำหนด
+    """
+    record = (
+        db.query(Attendance)
+        .filter(
+            Attendance.session_id == session_id,
+            Attendance.student_id == current_user.user_id,
+        )
+        .first()
+    )
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+
+    return {"session_id": str(session_id), "is_reverified": record.is_reverified}

@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../models/feed_item.dart';
 import '../screens/student_checkin_screen.dart';
-import '../screens/teacher_open_checkin_sheet.dart';
 
 import 'package:frontend/services/sessions_service.dart';
 import 'package:frontend/services/attendance_service.dart';
@@ -14,7 +13,7 @@ class FeedList extends StatelessWidget {
   final List<FeedItem> items;
   final bool isTeacher;
   final String classId;
-  final VoidCallback? onChanged; // ✅ callback ให้หน้าแม่รีเฟรช
+  final VoidCallback? onChanged; // callback ให้หน้าแม่รีเฟรช
 
   const FeedList({
     super.key,
@@ -72,14 +71,13 @@ class _FeedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ตอนนี้รองรับการ์ดประเภทเช็คชื่อเป็นหลัก
-    // ถ้าคุณมี FeedType อื่น ๆ ค่อยเพิ่ม switch แยกภายหลังได้
     return _buildCheckinCard(context);
   }
 
   Widget _buildCheckinCard(BuildContext context) {
     final dfTime = DateFormat('d MMM, HH:mm');
 
-    final exp = item.expiresAt != null
+    final expText = item.expiresAt != null
         ? 'หมดอายุ: ${dfTime.format(item.expiresAt!.toLocal())}'
         : 'กำลังเปิดอยู่';
 
@@ -95,7 +93,75 @@ class _FeedCard extends StatelessWidget {
     final notExpired = (item.expiresAt != null)
         ? item.expiresAt!.toUtc().isAfter(nowUtc)
         : false;
-    final canReverify = reverifyEnabled && notExpired;
+
+    // ถ้าไม่มี sessionId ก็แสดงการ์ดแบบพื้นฐาน
+    if (sessionId == null || sessionId.isEmpty) {
+      return _baseCard(
+        context: context,
+        expText: expText,
+        radius: radius,
+        lat: lat,
+        lon: lon,
+        reverifyEnabled: reverifyEnabled,
+        trailing: _studentOrTeacherButtons(
+          context: context,
+          sessionId: null,
+          hasCheckedIn: false,
+          canReverify: false,
+        ),
+      );
+    }
+
+    // มี sessionId → เช็คสถานะของผู้ใช้ใน session นี้
+    return FutureBuilder<Map<String, dynamic>>(
+      future: AttendanceService.getMyStatusForSession(sessionId),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        Map<String, dynamic> status = const {};
+        if (snap.hasData && snap.data is Map<String, dynamic>) {
+          status = snap.data!;
+        }
+
+        final hasCheckedIn = status['has_checked_in'] == true;
+
+        // can_reverify จาก backend (ถ้ามี) / ถ้าไม่มีให้ fallback ด้วย reverifyEnabled && ยังไม่หมดเวลา
+        final canReverifyFlag = status['can_reverify'] == true;
+        final canReverify = canReverifyFlag || (reverifyEnabled && notExpired);
+
+        return _baseCard(
+          context: context,
+          expText: expText,
+          radius: radius,
+          lat: lat,
+          lon: lon,
+          reverifyEnabled: reverifyEnabled,
+          trailing: _studentOrTeacherButtons(
+            context: context,
+            sessionId: sessionId,
+            hasCheckedIn: hasCheckedIn,
+            canReverify: canReverify,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _baseCard({
+    required BuildContext context,
+    required String expText,
+    required String? radius,
+    required String? lat,
+    required String? lon,
+    required bool reverifyEnabled,
+    required Widget trailing,
+  }) {
+    final dfTime = DateFormat('d MMM, HH:mm');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -109,216 +175,156 @@ class _FeedCard extends StatelessWidget {
               title: 'เช็คชื่อ',
               dateText: dfTime.format(item.postedAt.toLocal()),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               'เช็คชื่อกำลังเปิดอยู่',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-            RichText(
-              text: TextSpan(
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 14,
-                ), // ขนาดปกติของข้อความ
-                children: [
-                  TextSpan(text: '$exp · '), // ข้อความทั่วไป
-                  TextSpan(
-                    text: 'รัศมี ',
-                    style: const TextStyle(fontSize: 15), // ตัวอักษรใหญ่ขึ้น
-                  ),
-                  TextSpan(
-                    text: '${radius ?? '-'} m',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ), // ตัวหนาสำหรับค่า radius
-                  ),
-                ],
-              ),
+            Text(
+              '$expText · รัศมี ${radius ?? '-'} m',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 3),
             if (lat != null && lon != null)
               Text(
                 'Anchor: $lat, $lon',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            const SizedBox(height: 3),
-            RichText(
-              text: TextSpan(
-                style: Theme.of(context).textTheme.bodySmall, // สไตล์พื้นฐาน
-                children: [
-                  const TextSpan(text: 'Reverify: '),
-                  TextSpan(
-                    text: reverifyEnabled ? 'ON' : 'OFF',
-                    style: TextStyle(
-                      color: reverifyEnabled
-                          ? Colors.green
-                          : Colors.grey, // ON=เขียว, OFF=เทา
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+            Text(
+              'Reverify: ${reverifyEnabled ? "ON" : "OFF"}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                // ===== ปุ่มฝั่งครู =====
-                if (isTeacher) ...[
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                    ),
-                    onPressed: () async {
-                      final ok = await showModalBottomSheet<bool>(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) =>
-                            TeacherOpenCheckinSheet(classId: classId),
-                      );
-                      // ให้หน้าแม่รีเฟรชตามผล
-                      if (ok == true) onChanged?.call();
-                    },
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('เปิดใหม่'),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    // ถ้าอยากให้กดได้แม้ session หมดเวลา ให้เอา notExpired ออก
-                    onPressed: (sessionId != null /* && notExpired */ )
-                        ? () async {
-                            try {
-                              final next = !reverifyEnabled;
-                              final enabled =
-                                  await SessionsService.toggleReverify(
-                                    sessionId: sessionId!,
-                                    enabled: next,
-                                  );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      enabled
-                                          ? 'เปิด reverify แล้ว'
-                                          : 'ปิด reverify แล้ว',
-                                      style: const TextStyle(
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                              onChanged?.call(); // 🔁 รีเฟรชฟีด
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'สลับ reverify ไม่สำเร็จ: $e',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          }
-                        : null,
-                    child: Text(
-                      reverifyEnabled ? 'ปิด reverify' : 'เปิด reverify',
-                      style: TextStyle(color: Colors.grey[800]),
-                    ),
-                  ),
-                ],
-
-                // ===== ปุ่มฝั่งนักเรียน =====
-                if (!isTeacher) ...[
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              StudentCheckinScreen(classId: classId),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.verified_user),
-                    label: const Text('เช็คชื่อ'),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                    ),
-                    onPressed: (canReverify && sessionId != null)
-                        ? () async {
-                            try {
-                              // 1) เปิดหน้ากล้อง/เลือกรูป -> ได้ path
-                              final result = await Navigator.pushNamed(
-                                context,
-                                '/reverify-face',
-                              );
-                              if (result == null ||
-                                  result is! String ||
-                                  result.isEmpty)
-                                return;
-
-                              // 2) ดึง GPS
-                              final pos =
-                                  await LocationHelper.getCurrentPositionOrThrow();
-
-                              // 3) ยิง API re-verify
-                              await AttendanceService.reVerify(
-                                sessionId: sessionId!,
-                                imagePath: result,
-                                latitude: pos.latitude,
-                                longitude: pos.longitude,
-                              );
-
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                      'ยืนยันตัวตนซ้ำสำเร็จ',
-                                    ),
-                                  ),
-                                );
-                              }
-                              onChanged?.call(); // 🔁 รีเฟรชฟีด
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-                                );
-                              }
-                            }
-                          }
-                        : null,
-                    label: const Text(
-                      style: TextStyle(color: Colors.black),
-                      'ยืนยันซ้ำ',
-                    ),
-                  ),
-                ],
-
-                const SizedBox(width: 12),
-                // OutlinedButton.icon(
-                //   onPressed: () {},
-                //   icon: const Icon(Icons.chat_bubble_outline),
-                //   label: const Text('เพิ่มความคิดเห็น'),
-                // ),
-              ],
-            ),
+            Row(children: [trailing]),
           ],
         ),
       ),
     );
+  }
+
+  Widget _studentOrTeacherButtons({
+    required BuildContext context,
+    required String? sessionId,
+    required bool hasCheckedIn,
+    required bool canReverify,
+  }) {
+    if (isTeacher) {
+      // ปุ่มสำหรับครู: toggle reverify
+      return OutlinedButton(
+        onPressed: (sessionId != null)
+            ? () async {
+                try {
+                  final next = !(item.extra['reverify_enabled'] == true);
+                  final enabled = await SessionsService.toggleReverify(
+                    sessionId: sessionId!,
+                    enabled: next,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          enabled ? 'เปิด reverify แล้ว' : 'ปิด reverify แล้ว',
+                        ),
+                      ),
+                    );
+                  }
+                  onChanged?.call(); // รีเฟรชฟีด
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('สลับ reverify ไม่สำเร็จ: $e')),
+                    );
+                  }
+                }
+              }
+            : null,
+        child: Text(
+          item.extra['reverify_enabled'] == true
+              ? 'ปิด reverify'
+              : 'เปิด reverify',
+        ),
+      );
+    }
+
+    // -------- นักเรียน --------
+    // ถ้าไม่มี sessionId ก็ไม่มีปุ่มพิเศษ
+    if (sessionId == null) {
+      return const SizedBox.shrink();
+    }
+
+    final buttons = <Widget>[];
+
+    // ปุ่มเช็คชื่อ: แสดงเฉพาะยังไม่เช็ค
+    if (!hasCheckedIn) {
+      buttons.add(
+        FilledButton.icon(
+          onPressed: () async {
+            final ok = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StudentCheckinScreen(classId: classId),
+              ),
+            );
+            if (ok == true) onChanged?.call(); // รีเฟรชฟีด
+          },
+          icon: const Icon(Icons.verified_user),
+          label: const Text('เช็คชื่อ'),
+        ),
+      );
+      buttons.add(const SizedBox(width: 12));
+    }
+
+    // ปุ่มยืนยันซ้ำ: แสดงตามสถานะ is_reverified จาก backend
+    buttons.add(
+      FutureBuilder<bool>(
+        future: AttendanceService.getIsReverified(sessionId),
+        builder: (context, snap) {
+          final isReverified = snap.data == true;
+          final enableReverify = hasCheckedIn && canReverify && !isReverified;
+
+          return OutlinedButton.icon(
+            onPressed: enableReverify
+                ? () async {
+                    try {
+                      final result = await Navigator.pushNamed(
+                        context,
+                        '/reverify-face',
+                      );
+                      if (result == null || result is! String || result.isEmpty)
+                        return;
+
+                      final pos =
+                          await LocationHelper.getCurrentPositionOrThrow();
+                      await AttendanceService.reVerify(
+                        sessionId: sessionId,
+                        imagePath: result,
+                        latitude: pos.latitude,
+                        longitude: pos.longitude,
+                      );
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('ยืนยันตัวตนซ้ำสำเร็จ')),
+                        );
+                      }
+                      onChanged?.call(); // รีเฟรชฟีดให้ปุ่มเป็น "ยืนยันแล้ว"
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+                        );
+                      }
+                    }
+                  }
+                : null,
+            icon: const Icon(Icons.verified_user_outlined),
+            label: Text(isReverified ? 'ยืนยันแล้ว' : 'ยืนยันซ้ำ'),
+          );
+        },
+      ),
+    );
+
+    return Row(children: buttons);
   }
 }
 
@@ -339,9 +345,7 @@ class _HeaderRow extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: Colors.blueAccent.withOpacity(
-            0.15,
-          ), // พื้นหลังฟ้าอ่อน
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           child: Icon(icon, size: 18, color: color),
         ),
         const SizedBox(width: 8),
