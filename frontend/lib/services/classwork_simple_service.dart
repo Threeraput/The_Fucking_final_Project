@@ -4,10 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
-
-// ===== ใช้โมเดลที่เราสร้างไว้ =====
 import 'package:frontend/models/classwork.dart';
-
 import 'auth_service.dart' show AuthService;
 
 // ให้ใช้รูปแบบเดียวกับไฟล์อื่นๆ ในโปรเจกต์คุณ
@@ -46,8 +43,6 @@ class ClassworkSimpleService {
   }
 
   // ============ STUDENT (raw) ============
-  /// GET /classwork-simple/student/{class_id}/assignments
-  /// คืน List ของ assignment + ฟิลด์ computed_status, my_submission (RAW)
   static Future<List<dynamic>> getStudentAssignments(String classId) async {
     final url = Uri.parse('$_base/student/$classId/assignments');
     final res = await http
@@ -59,7 +54,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// POST /classwork-simple/assignments/{assignment_id}/submit  (multipart/pdf) (RAW)
   static Future<Map<String, dynamic>> submitPdf({
     required String assignmentId,
     required File pdfFile,
@@ -69,7 +63,6 @@ class ClassworkSimpleService {
     final headers = await _headersAuthOnly();
     req.headers.addAll(headers);
 
-    // ตรวจว่าเป็น PDF จริง ๆ
     final mime = (lookupMimeType(pdfFile.path) ?? '').toLowerCase();
     if (!mime.contains('pdf')) {
       throw Exception('กรุณาเลือกไฟล์ PDF เท่านั้น');
@@ -93,7 +86,6 @@ class ClassworkSimpleService {
   }
 
   // ============ TEACHER (raw) ============
-  /// POST /classwork-simple/assignments  (create) (RAW)
   static Future<Map<String, dynamic>> createAssignment({
     required String classId,
     required String title,
@@ -116,7 +108,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// GET /classwork-simple/assignments/{assignment_id}/submissions (RAW)
   static Future<List<dynamic>> listSubmissionsForTeacher(
     String assignmentId,
   ) async {
@@ -130,7 +121,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// POST /classwork-simple/assignments/{assignment_id}/grade (RAW)
   static Future<Map<String, dynamic>> gradeSubmission({
     required String assignmentId,
     required String studentId,
@@ -147,7 +137,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// GET /classwork-simple/teacher/{class_id}/assignments (RAW)
   static Future<List<dynamic>> listAssignmentsForClassAsTeacher(
     String classId,
   ) async {
@@ -164,8 +153,6 @@ class ClassworkSimpleService {
   // =======================
   // ====== TYPED API ======
   // =======================
-
-  /// STUDENT (typed): ได้เป็น List<StudentAssignmentView>
   static Future<List<StudentAssignmentView>> getStudentAssignmentsTyped(
     String classId,
   ) async {
@@ -179,7 +166,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// TEACHER (typed): รายการส่งของงานหนึ่ง
   static Future<List<TeacherSubmissionRow>> listSubmissionsForTeacherTyped(
     String assignmentId,
   ) async {
@@ -193,7 +179,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// TEACHER (typed): สร้างงาน -> ClassworkAssignment
   static Future<ClassworkAssignment> createAssignmentTyped({
     required String classId,
     required String title,
@@ -216,7 +201,6 @@ class ClassworkSimpleService {
     throw _errorFrom(res);
   }
 
-  /// TEACHER (typed): รายการงานของคลาส -> List<ClassworkAssignment>
   static Future<List<ClassworkAssignment>>
   listAssignmentsForClassAsTeacherTyped(String classId) async {
     final url = Uri.parse('$_base/teacher/$classId/assignments');
@@ -227,5 +211,35 @@ class ClassworkSimpleService {
       return decodeList(res.body, (m) => ClassworkAssignment.fromJson(m));
     }
     throw _errorFrom(res);
+  }
+
+  // ✅ เพิ่มฟังก์ชันพิเศษที่ใช้ในหน้า “ดูงานนักเรียน”
+  static Future<List<ClassworkSubmission>> getSubmissionsForAssignment(
+    String assignmentId,
+  ) async {
+    final url = Uri.parse('$_base/assignments/$assignmentId/submissions');
+    final res = await http
+        .get(url, headers: await _headersAuthOnly())
+        .timeout(_kTimeout);
+    if (res.statusCode == 200) {
+      final List data = json.decode(res.body);
+      return data.map((e) => ClassworkSubmission.fromJson(e)).toList();
+    }
+    throw _errorFrom(res);
+  }
+
+  static Future<void> gradeSubmissionForAssignment({
+    required String assignmentId,
+    required String studentId,
+    required int score,
+  }) async {
+    final url = Uri.parse('$_base/assignments/$assignmentId/grade');
+    final body = json.encode({'student_id': studentId, 'score': score});
+    final res = await http
+        .post(url, headers: await _headersJson(), body: body)
+        .timeout(_kTimeout);
+    if (res.statusCode != 200) {
+      throw _errorFrom(res);
+    }
   }
 }

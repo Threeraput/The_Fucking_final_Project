@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:frontend/screens/assignment_detail_screen.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_assignment_screen.dart';
 import 'package:frontend/screens/verify_face_route.dart';
@@ -145,6 +146,15 @@ class MyApp extends StatelessWidget {
         '/create-assignment': (context) {
           final classId = ModalRoute.of(context)!.settings.arguments as String;
           return CreateAssignmentScreen(classId: classId);
+        },
+
+        '/assignment-detail': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map;
+          return AssignmentDetailScreen(
+            assignmentId: args['assignmentId'],
+            title: args['title'] ?? 'Assignment',
+            classId: args['classId'],
+          );
         },
       },
     );

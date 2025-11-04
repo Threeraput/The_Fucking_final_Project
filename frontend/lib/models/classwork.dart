@@ -1,7 +1,11 @@
 // lib/models/classwork.dart
 import 'dart:convert';
 
-/// สถานะความตรงเวลาในการส่งงาน (ฝั่ง backend ส่ง string: "On_Time", "Late", "Not_Submitted")
+/// ===============================
+/// Enums & helpers
+/// ===============================
+
+/// สถานะความตรงเวลาในการส่งงาน (backend ส่ง: "On_Time", "Late", "Not_Submitted")
 enum SubmissionLateness { onTime, late, notSubmitted }
 
 SubmissionLateness latenessFromString(String? v) {
@@ -27,13 +31,17 @@ String latenessToString(SubmissionLateness v) {
   }
 }
 
-/// การส่งงานของนักเรียน
+/// ===============================
+/// Core Models
+/// ===============================
+
+/// การส่งงานของนักเรียน (ระเบียนเต็มจากตาราง submissions)
 class ClassworkSubmission {
   final String submissionId;
   final String assignmentId;
   final String studentId;
-
-  final String? contentUrl;        // เช่น "workpdf/<uuid>.pdf"
+  
+  final String? contentUrl; // เช่น "workpdf/<uuid>.pdf"
   final DateTime? submittedAt;
 
   final SubmissionLateness submissionStatus;
@@ -70,9 +78,15 @@ class ClassworkSubmission {
       submittedAt: _parseDt(j['submitted_at']),
       submissionStatus: latenessFromString(j['submission_status']?.toString()),
       graded: j['graded'] == true,
-      score: (j['score'] is num) ? (j['score'] as num).toInt() : (j['score'] as int?),
-      createdAt: DateTime.tryParse(j['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(j['updated_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+      score: (j['score'] is num)
+          ? (j['score'] as num).toInt()
+          : (j['score'] as int?),
+      createdAt:
+          DateTime.tryParse(j['created_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(j['updated_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
     );
   }
 
@@ -120,10 +134,18 @@ class ClassworkAssignment {
       classId: j['class_id']?.toString() ?? '',
       teacherId: j['teacher_id']?.toString() ?? '',
       title: j['title']?.toString() ?? '',
-      maxScore: (j['max_score'] is num) ? (j['max_score'] as num).toInt() : (j['max_score'] as int? ?? 0),
-      dueDate: DateTime.tryParse(j['due_date']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
-      createdAt: DateTime.tryParse(j['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(j['updated_at']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+      maxScore: (j['max_score'] is num)
+          ? (j['max_score'] as num).toInt()
+          : (j['max_score'] as int? ?? 100),
+      dueDate:
+          DateTime.tryParse(j['due_date']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      createdAt:
+          DateTime.tryParse(j['created_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(j['updated_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
     );
   }
 
@@ -140,9 +162,7 @@ class ClassworkAssignment {
 }
 
 /// มุมมองฝั่งนักเรียน: งาน + สถานะของฉัน (my_submission) + computed_status
-/// บาง backend อาจส่งฟิลด์แบน (flatten) มาเลย เราจึงรองรับทั้ง 2 แบบ:
-/// - แบบ A: {... assignment fields ..., "computed_status": "...", "my_submission": {...}}
-/// - แบบ B: {"assignment": {...}, "computed_status": "...", "my_submission": {...}}
+/// รองรับทั้งรูปแบบ flatten และ nested {"assignment": {...}}
 class StudentAssignmentView {
   final ClassworkAssignment assignment;
   final SubmissionLateness computedStatus;
@@ -168,13 +188,13 @@ class StudentAssignmentView {
     if (my is Map<String, dynamic>) {
       mySub = ClassworkSubmission.fromJson(my);
     } else {
-      // บาง API อาจคืน null หรือไม่ส่งมา
       mySub = null;
     }
 
-    final statusStr = j['computed_status']?.toString()
-        ?? assignJson['computed_status']?.toString()
-        ?? 'Not_Submitted';
+    final statusStr =
+        j['computed_status']?.toString() ??
+        assignJson['computed_status']?.toString() ??
+        'Not_Submitted';
 
     return StudentAssignmentView(
       assignment: assignment,
@@ -190,7 +210,7 @@ class StudentAssignmentView {
   };
 }
 
-/// รายการส่งของนักเรียน (หน้าครูดู submissions ของงานหนึ่งงาน)
+/// แถวข้อมูลการส่งของนักเรียน (สำหรับรายการในหน้าครู)
 class TeacherSubmissionRow {
   final String studentId;
   final String? contentUrl;
@@ -216,7 +236,9 @@ class TeacherSubmissionRow {
       studentId: j['student_id']?.toString() ?? '',
       contentUrl: j['content_url']?.toString(),
       graded: j['graded'] == true,
-      score: (j['score'] is num) ? (j['score'] as num).toInt() : (j['score'] as int?),
+      score: (j['score'] is num)
+          ? (j['score'] as num).toInt()
+          : (j['score'] as int?),
       submissionStatus: latenessFromString(j['submission_status']?.toString()),
       submittedAt: _parseDt(j['submitted_at']),
     );
@@ -232,7 +254,86 @@ class TeacherSubmissionRow {
   };
 }
 
-// Helper: decode list
+/// ===============================
+/// Teacher detailed view model
+/// ===============================
+
+/// โมเดลสำหรับ “หน้าครูดู/ให้คะแนนรายคน”
+/// (ยืดหยุ่น: เผื่อ backend ส่งชื่อ/อีเมล/URL ที่ต่างคีย์กัน)
+class StudentSubmission {
+  final String submissionId;
+  final String assignmentId;
+  final String studentId;
+
+  /// อาจมาจาก backend ที่ชื่อไม่เหมือนกัน: student_name หรือ name
+  final String? studentName;
+
+  /// URL ไฟล์ PDF ที่ส่ง (content_url / file_url)
+  final String? fileUrl;
+
+  final DateTime? submittedAt;
+  final bool graded;
+  final int? score;
+  final SubmissionLateness submissionStatus;
+
+  StudentSubmission({
+    required this.submissionId,
+    required this.assignmentId,
+    required this.studentId,
+    required this.submissionStatus,
+    this.studentName,
+    this.fileUrl,
+    this.submittedAt,
+    this.graded = false,
+    this.score,
+  });
+
+  factory StudentSubmission.fromJson(Map<String, dynamic> j) {
+    final subId = (j['submission_id'] ?? j['id'] ?? '').toString();
+    final asgId = (j['assignment_id'] ?? '').toString();
+    final stuId = (j['student_id'] ?? '').toString();
+    final statRaw = (j['submission_status'] ?? 'Not_Submitted').toString();
+    final status = latenessFromString(statRaw);
+
+    DateTime? submitted;
+    final subAt = j['submitted_at']?.toString();
+    if (subAt != null && subAt.isNotEmpty) {
+      submitted = DateTime.tryParse(subAt)?.toLocal();
+    }
+
+    return StudentSubmission(
+      submissionId: subId,
+      assignmentId: asgId,
+      studentId: stuId,
+      studentName: j['student_name']?.toString() ?? j['name']?.toString(),
+      fileUrl: j['content_url']?.toString() ?? j['file_url']?.toString(),
+      submittedAt: submitted,
+      graded: j['graded'] == true,
+      score: (j['score'] is num)
+          ? (j['score'] as num).toInt()
+          : int.tryParse('${j['score']}'),
+      submissionStatus: status,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'submission_id': submissionId,
+    'assignment_id': assignmentId,
+    'student_id': studentId,
+    'student_name': studentName,
+    'content_url': fileUrl,
+    'submitted_at': submittedAt?.toUtc().toIso8601String(),
+    'graded': graded,
+    'score': score,
+    'submission_status': latenessToString(submissionStatus),
+  };
+}
+
+/// ===============================
+/// Utilities
+/// ===============================
+
+/// Helper: decode list<T> จาก JSON array
 List<T> decodeList<T>(String body, T Function(Map<String, dynamic>) factory) {
   final raw = json.decode(body) as List;
   return raw.map((e) => factory(e as Map<String, dynamic>)).toList();

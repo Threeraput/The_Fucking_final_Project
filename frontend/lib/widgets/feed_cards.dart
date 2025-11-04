@@ -70,24 +70,31 @@ class _FeedCard extends StatelessWidget {
     this.onChanged,
   });
 
-  @override
+@override
   Widget build(BuildContext context) {
-    // ✅ แยกชนิดการ์ดตาม extra.kind
-    final kind = (item.extra['kind'] ?? '').toString();
+    // ✅ ป้องกัน extra เป็น null หรือไม่ใช่ Map
+    final extra = Map<String, dynamic>.from(item.extra ?? {});
 
-    if (kind == 'assignment') {
-      return AssignmentCard(
-        classId: classId,
-        extra: item.extra,
-        postedAt: item.postedAt,
-        isTeacher: isTeacher,
-        onChanged: onChanged,
-      );
+    // ✅ แยกชนิดการ์ด (ไม่สนตัวพิมพ์ใหญ่เล็ก)
+    final kind = (extra['kind']?.toString().toLowerCase() ?? '');
+
+    switch (kind) {
+      case 'assignment':
+        return AssignmentCard(
+          classId: classId,
+          extra: extra,
+          postedAt: item.postedAt,
+          isTeacher: isTeacher,
+          onChanged: onChanged,
+        );
+
+      // ✅ สามารถขยายในอนาคต เช่น case 'announcement', 'quiz' ได้
+      default:
+        // ✅ ค่าเริ่มต้น: การ์ดเช็คชื่อ (เดิม)
+        return _buildCheckinCard(context);
     }
-
-    // ✅ ค่าเริ่มต้น: การ์ดเช็คชื่อ (เดิม)
-    return _buildCheckinCard(context);
   }
+
 
   /// ===== การ์ดเช็คชื่อ (เดิม) =====
   Widget _buildCheckinCard(BuildContext context) {

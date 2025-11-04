@@ -385,17 +385,18 @@ class _ClassworkTabState extends State<_ClassworkTab> {
   late Future<List<FeedItem>> _futureAssignments;
 
   @override
-  void initState() {
+void initState() {
     super.initState();
-    _futureAssignments = FeedService.getClassFeed(widget.classId);
+    _futureAssignments = widget.isTeacher
+        ? FeedService.getClassFeedForTeacherWithAssignments(widget.classId)
+        : FeedService.getClassFeedForStudentWithAssignments(widget.classId);
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _futureAssignments = FeedService.getClassFeed(
-        widget.classId,
-       
-      );
+      _futureAssignments = widget.isTeacher
+          ? FeedService.getClassFeedForTeacherWithAssignments(widget.classId)
+          : FeedService.getClassFeedForStudentWithAssignments(widget.classId);
     });
   }
 
