@@ -1,6 +1,8 @@
 // lib/services/feed_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:frontend/services/classwork_simple_service.dart';
+import 'package:frontend/models/classwork.dart';
 
 import '../models/feed_item.dart';
 import 'attendance_service.dart';
@@ -114,4 +116,77 @@ class FeedService {
 
     return result;
   }
+
+  static Future<List<FeedItem>> getClassFeedForTeacherWithAssignments(
+    String classId,
+  ) async {
+    final items = await getClassFeed(classId);
+    try {
+      final asgs =
+          await ClassworkSimpleService.listAssignmentsForClassAsTeacherTyped(
+            classId,
+          );
+      for (final a in asgs) {
+        items.add(
+          FeedItem(
+            id: 'asg:${a.assignmentId}',
+            classId: classId,
+            type: FeedType.checkin, // ใช้ type เดิม แต่บอกชนิดผ่าน extra.kind
+            title: 'งาน: ${a.title}',
+            postedAt: a.createdAt,
+            expiresAt: a.dueDate,
+            extra: {
+              'kind': 'assignment',
+              'assignment_id': a.assignmentId,
+              'title': a.title,
+              'due_date': a.dueDate.toIso8601String(),
+              'max_score': a.maxScore,
+            },
+          ),
+        );
+      }
+    } catch (_) {}
+    items.sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return items;
+  }
+
+  static Future<List<FeedItem>> getClassFeedForStudentWithAssignments(
+    String classId,
+  ) async {
+    final base = await getClassFeedForStudent(
+      classId,
+    ); // ฟีดที่กรองเช็คชื่อให้ก่อน
+    final items = <FeedItem>[...base];
+    try {
+      final list = await ClassworkSimpleService.getStudentAssignmentsTyped(
+        classId,
+      );
+      for (final v in list) {
+        final a = v.assignment;
+        items.add(
+          FeedItem(
+            id: 'asg:${a.assignmentId}',
+            classId: classId,
+            type: FeedType.checkin,
+            title: 'งาน: ${a.title}',
+            postedAt: a.createdAt,
+            expiresAt: a.dueDate,
+            extra: {
+              'kind': 'assignment',
+              'assignment_id': a.assignmentId,
+              'title': a.title,
+              'due_date': a.dueDate.toIso8601String(),
+              'max_score': a.maxScore,
+              'computed_status': latenessToString(v.computedStatus),
+              'my_submission': v.mySubmission?.toJson(),
+            },
+          ),
+        );
+      }
+    } catch (_) {}
+    items.sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return items;
+  }
 }
+
+

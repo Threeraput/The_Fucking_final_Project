@@ -4,10 +4,12 @@ import 'package:intl/intl.dart';
 
 import '../models/feed_item.dart';
 import '../screens/student_checkin_screen.dart';
-
 import 'package:frontend/services/sessions_service.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/utils/location_helper.dart';
+
+// ✅ เพิ่ม import สำหรับการ์ดงาน (assignment)
+import 'package:frontend/widgets/assignment_card.dart';
 
 class FeedList extends StatelessWidget {
   final List<FeedItem> items;
@@ -70,13 +72,26 @@ class _FeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ตอนนี้รองรับการ์ดประเภทเช็คชื่อเป็นหลัก
+    // ✅ แยกชนิดการ์ดตาม extra.kind
+    final kind = (item.extra['kind'] ?? '').toString();
+
+    if (kind == 'assignment') {
+      return AssignmentCard(
+        classId: classId,
+        extra: item.extra,
+        postedAt: item.postedAt,
+        isTeacher: isTeacher,
+        onChanged: onChanged,
+      );
+    }
+
+    // ✅ ค่าเริ่มต้น: การ์ดเช็คชื่อ (เดิม)
     return _buildCheckinCard(context);
   }
 
+  /// ===== การ์ดเช็คชื่อ (เดิม) =====
   Widget _buildCheckinCard(BuildContext context) {
     final dfTime = DateFormat('d MMM, HH:mm');
-
     final expText = item.expiresAt != null
         ? 'หมดอายุ: ${dfTime.format(item.expiresAt!.toLocal())}'
         : 'กำลังเปิดอยู่';
@@ -94,10 +109,11 @@ class _FeedCard extends StatelessWidget {
         ? item.expiresAt!.toUtc().isAfter(nowUtc)
         : false;
 
-    // ถ้าไม่มี sessionId ก็แสดงการ์ดแบบพื้นฐาน
+    // ถ้าไม่มี sessionId → การ์ดแบบพื้นฐาน
     if (sessionId == null || sessionId.isEmpty) {
       return _baseCard(
         context: context,
+        title: 'เช็คชื่อ',
         expText: expText,
         radius: radius,
         lat: lat,
@@ -112,7 +128,7 @@ class _FeedCard extends StatelessWidget {
       );
     }
 
-    // มี sessionId → เช็คสถานะของผู้ใช้ใน session นี้
+    // ถ้ามี sessionId → โหลดสถานะของผู้ใช้
     return FutureBuilder<Map<String, dynamic>>(
       future: AttendanceService.getMyStatusForSession(sessionId),
       builder: (context, snap) {
@@ -123,19 +139,18 @@ class _FeedCard extends StatelessWidget {
           );
         }
 
-        Map<String, dynamic> status = const {};
+        Map<String, dynamic> status = {};
         if (snap.hasData && snap.data is Map<String, dynamic>) {
           status = snap.data!;
         }
 
         final hasCheckedIn = status['has_checked_in'] == true;
-
-        // can_reverify จาก backend (ถ้ามี) / ถ้าไม่มีให้ fallback ด้วย reverifyEnabled && ยังไม่หมดเวลา
         final canReverifyFlag = status['can_reverify'] == true;
         final canReverify = canReverifyFlag || (reverifyEnabled && notExpired);
 
         return _baseCard(
           context: context,
+          title: 'เช็คชื่อ',
           expText: expText,
           radius: radius,
           lat: lat,
@@ -152,8 +167,10 @@ class _FeedCard extends StatelessWidget {
     );
   }
 
+  /// ============ การ์ดพื้นฐาน ============
   Widget _baseCard({
     required BuildContext context,
+    required String title,
     required String expText,
     required String? radius,
     required String? lat,
@@ -172,12 +189,12 @@ class _FeedCard extends StatelessWidget {
           children: [
             _HeaderRow(
               icon: Icons.access_time,
-              title: 'เช็คชื่อ',
+              title: title,
               dateText: dfTime.format(item.postedAt.toLocal()),
             ),
             const SizedBox(height: 8),
             Text(
-              'เช็คชื่อกำลังเปิดอยู่',
+              '$titleกำลังเปิดอยู่',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
@@ -202,6 +219,7 @@ class _FeedCard extends StatelessWidget {
     );
   }
 
+  /// ปุ่มฝั่งครู/นักเรียน (เฉพาะการ์ดเช็คชื่อ)
   Widget _studentOrTeacherButtons({
     required BuildContext context,
     required String? sessionId,
@@ -228,7 +246,7 @@ class _FeedCard extends StatelessWidget {
                       ),
                     );
                   }
-                  onChanged?.call(); // รีเฟรชฟีด
+                  onChanged?.call();
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -246,15 +264,11 @@ class _FeedCard extends StatelessWidget {
       );
     }
 
-    // -------- นักเรียน --------
-    // ถ้าไม่มี sessionId ก็ไม่มีปุ่มพิเศษ
-    if (sessionId == null) {
-      return const SizedBox.shrink();
-    }
-
+    // นักเรียน
+    if (sessionId == null) return const SizedBox.shrink();
     final buttons = <Widget>[];
 
-    // ปุ่มเช็คชื่อ: แสดงเฉพาะยังไม่เช็ค
+    // ปุ่มเช็คชื่อ
     if (!hasCheckedIn) {
       buttons.add(
         FilledButton.icon(
@@ -265,7 +279,7 @@ class _FeedCard extends StatelessWidget {
                 builder: (_) => StudentCheckinScreen(classId: classId),
               ),
             );
-            if (ok == true) onChanged?.call(); // รีเฟรชฟีด
+            if (ok == true) onChanged?.call();
           },
           icon: const Icon(Icons.verified_user),
           label: const Text('เช็คชื่อ'),
@@ -274,7 +288,7 @@ class _FeedCard extends StatelessWidget {
       buttons.add(const SizedBox(width: 12));
     }
 
-    // ปุ่มยืนยันซ้ำ: แสดงตามสถานะ is_reverified จาก backend
+    // ปุ่มยืนยันซ้ำ
     buttons.add(
       FutureBuilder<bool>(
         future: AttendanceService.getIsReverified(sessionId),
@@ -307,7 +321,7 @@ class _FeedCard extends StatelessWidget {
                           const SnackBar(content: Text('ยืนยันตัวตนซ้ำสำเร็จ')),
                         );
                       }
-                      onChanged?.call(); // รีเฟรชฟีดให้ปุ่มเป็น "ยืนยันแล้ว"
+                      onChanged?.call();
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -332,6 +346,7 @@ class _HeaderRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String dateText;
+
   const _HeaderRow({
     required this.icon,
     required this.title,

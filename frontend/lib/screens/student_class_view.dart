@@ -1,16 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:frontend/models/feed_item.dart';
-import 'package:frontend/screens/student_reverify_screen.dart';
 import 'package:frontend/services/feed_service.dart';
-import 'package:frontend/utils/location_helper.dart';
 import 'package:frontend/widgets/feed_cards.dart';
+import 'package:frontend/widgets/active_sessions_banner.dart';
+import 'package:frontend/utils/location_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
-import "package:frontend/screens/classroom_home_screen.dart";
-import 'package:frontend/widgets/active_sessions_banner.dart';
-
+import 'package:frontend/screens/classroom_home_screen.dart';
 
 class StudentClassView extends StatefulWidget {
   final String classId; // <- ต้องเป็น UUID ของคลาส
@@ -35,6 +33,7 @@ class _StudentClassViewState extends State<StudentClassView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.className)),
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         selectedItemColor: const Color.fromARGB(255, 65, 171, 179),
@@ -61,7 +60,6 @@ class _StudentClassViewState extends State<StudentClassView> {
           ),
         ],
       ),
-      body: _buildBody(),
     );
   }
 
@@ -69,12 +67,12 @@ class _StudentClassViewState extends State<StudentClassView> {
     switch (_currentIndex) {
       case 0:
         return _StudentStreamTab(
-          classId: widget.classId, // ✅ ส่ง classId เข้ามาใช้กรอง
+          classId: widget.classId,
           className: widget.className,
           teacherName: widget.teacherName,
         );
       case 1:
-        return const _StudentClassworkTab();
+        return _StudentClassworkTab(classId: widget.classId);
       case 2:
         return const _StudentReportTab();
       case 3:
@@ -85,8 +83,9 @@ class _StudentClassViewState extends State<StudentClassView> {
   }
 }
 
-final color = getClassColor('Example Class'); // ตัวอย่างการใช้ฟังก์ชัน
-
+/// ======================
+/// 🔹 STREAM TAB (ฟีดเช็คชื่อ/ประกาศ)
+/// ======================
 class _StudentStreamTab extends StatefulWidget {
   final String classId;
   final String className;
@@ -149,17 +148,16 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
 
           // แบนเนอร์เช็คชื่อที่กำลังเปิด (นักเรียน)
-//ActiveSessionsBanner(classId: classId, isTeacherView: false),
+          //ActiveSessionsBanner(classId: classId, isTeacherView: false),
 
           const SizedBox(height: 16),
           Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
 
-          // ✅ ใช้ฟีดจริง แทนการ์ด "No announcements yet."
+          // ✅ ฟีด Stream จริง (feed_cards)
           FutureBuilder<List<FeedItem>>(
             future: _futureFeed,
             builder: (context, snap) {
@@ -180,9 +178,9 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
               final feed = snap.data ?? const <FeedItem>[];
               return FeedList(
                 items: feed,
-                isTeacher: false, // ✅ นักเรียน
+                isTeacher: false,
                 classId: classId,
-                onChanged: _refresh, // กด action ในการ์ดให้รีเฟรชได้
+                onChanged: _refresh,
               );
             },
           ),
@@ -192,24 +190,80 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
   }
 }
 
-class _StudentClassworkTab extends StatelessWidget {
-  const _StudentClassworkTab();
+/// ======================
+/// 🔹 CLASSWORK TAB (งาน/Assignment)
+/// ======================
+class _StudentClassworkTab extends StatefulWidget {
+  final String classId;
+  const _StudentClassworkTab({required this.classId});
+
+  @override
+  State<_StudentClassworkTab> createState() => _StudentClassworkTabState();
+}
+
+class _StudentClassworkTabState extends State<_StudentClassworkTab> {
+  late Future<List<FeedItem>> _futureAssignments;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureAssignments = FeedService.getClassFeed(widget.classId);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _futureAssignments = FeedService.getClassFeed(widget.classId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Classwork — งานที่ได้รับมอบหมายจะอยู่ที่นี่',
-          style: Theme.of(context).textTheme.bodyLarge,
-          textAlign: TextAlign.center,
-        ),
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: FutureBuilder<List<FeedItem>>(
+        future: _futureAssignments,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snap.hasError) {
+            return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
+          }
+
+          final feed = snap.data ?? [];
+          // ✅ กรองเฉพาะ feed ที่เป็น assignment
+          final assignments = feed
+              .where((f) => (f.extra['kind'] ?? '') == 'assignment')
+              .toList();
+
+          if (assignments.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('ยังไม่มีงานในคลาสนี้'),
+              ),
+            );
+          }
+
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: FeedList(
+              items: assignments,
+              isTeacher: false,
+              classId: widget.classId,
+              onChanged: _refresh,
+            ),
+          );
+        },
       ),
     );
   }
 }
 
+/// ======================
+/// 🔹 REPORT TAB
+/// ======================
 class _StudentReportTab extends StatelessWidget {
   const _StudentReportTab();
 
@@ -228,6 +282,9 @@ class _StudentReportTab extends StatelessWidget {
   }
 }
 
+/// ======================
+/// 🔹 PEOPLE TAB
+/// ======================
 class _StudentPeopleTab extends StatelessWidget {
   final String teacherName;
   const _StudentPeopleTab({required this.teacherName});
@@ -256,7 +313,3 @@ class _StudentPeopleTab extends StatelessWidget {
     );
   }
 }
-
-/// ===========================================
-/// Active Sessions (Student) - auto refresh + check-in button
-/// ===========================================
