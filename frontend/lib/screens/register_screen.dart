@@ -32,16 +32,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _lastNameError;
   String? _emailError;
 
+  // ✅ สถานะตรวจสอบรหัสผ่าน
+  bool hasUppercase = false;
+  bool hasLowercase = false;
+  bool hasNumber = false;
+  bool hasSpecialChar = false;
+  bool hasMinLength = false;
+  bool _showPasswordChecklist = false;
+  bool _expandChecklist = false;
+
   @override
   void initState() {
     super.initState();
     _selectedRole = _roles.first;
 
+    // เคลียร์ error เมื่อพิมพ์ใหม่
     _usernameController.addListener(() {
       if (_usernameError != null) setState(() => _usernameError = null);
     });
     _passwordController.addListener(() {
       if (_passwordError != null) setState(() => _passwordError = null);
+      _checkPasswordStatus(_passwordController.text);
     });
     _firstNameController.addListener(() {
       if (_firstNameError != null) setState(() => _firstNameError = null);
@@ -54,33 +65,60 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
+  /// ✅ ตรวจสอบแต่ละเงื่อนไขของรหัสผ่าน
+  void _checkPasswordStatus(String password) {
+    setState(() {
+      hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      hasLowercase = password.contains(RegExp(r'[a-z]'));
+      hasNumber = password.contains(RegExp(r'\d'));
+      hasSpecialChar = password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'));
+      hasMinLength = password.length >= 8;
+    });
+  }
+
+  /// ✅ ตรวจสอบรหัสผ่านว่าผ่านทุกข้อหรือไม่
+  bool _isPasswordSecure(String password) {
+    return hasUppercase &&
+        hasLowercase &&
+        hasNumber &&
+        hasSpecialChar &&
+        hasMinLength;
+  }
+
   Future<void> _register() async {
     bool isValid = true;
+    String password = _passwordController.text;
 
     if (_usernameController.text.isEmpty) {
       setState(() => _usernameError = 'Enter your username');
       isValid = false;
     }
-    if (_passwordController.text.isEmpty) {
+
+    if (password.isEmpty) {
       setState(() => _passwordError = 'Enter your password');
       isValid = false;
+    } else if (!_isPasswordSecure(password)) {
+      setState(() => _passwordError = 'Password does not meet all requirements.');
+      isValid = false;
     }
+
     if (_firstNameController.text.isEmpty) {
-      setState(() => _firstNameError = 'Enter your FirstName');
+      setState(() => _firstNameError = 'Enter your First Name');
       isValid = false;
     }
     if (_lastNameController.text.isEmpty) {
-      setState(() => _lastNameError = 'Enter your LastName');
+      setState(() => _lastNameError = 'Enter your Last Name');
       isValid = false;
     }
     if (_emailController.text.isEmpty) {
       setState(() => _emailError = 'Enter your Email');
       isValid = false;
     }
+
     if (_selectedRole == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Enter your Role')));
+      ).showSnackBar(const SnackBar(content: Text('Select your Role')));
       isValid = false;
     }
 
@@ -93,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final userData = {
       'username': _usernameController.text,
-      'password': _passwordController.text,
+      'password': password,
       'first_name': _firstNameController.text,
       'last_name': _lastNameController.text,
       'email': _emailController.text,
@@ -121,6 +159,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  /// ✅ Widget แสดง checklist เงื่อนไขรหัสผ่าน
+  Widget _buildPasswordChecklist() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCheckItem('At least 8 characters', hasMinLength),
+        _buildCheckItem('At least one uppercase letter (A-Z)', hasUppercase),
+        _buildCheckItem('At least one lowercase letter (a-z)', hasLowercase),
+        _buildCheckItem('At least one number (0-9)', hasNumber),
+        _buildCheckItem(
+          'At least one special character (!@#\$%^&*)',
+          hasSpecialChar,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCheckItem(String text, bool isPassed) {
+    return Row(
+      children: [
+        Icon(
+          isPassed ? Icons.check_circle : Icons.cancel,
+          color: isPassed ? Colors.green : Colors.red,
+          size: 18,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            color: isPassed ? Colors.green[700] : Colors.red[700],
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -161,6 +236,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               obscureText: true,
             ),
+            const SizedBox(height: 8),
+
+            // ✅ ข้อความเตือนสั้น ๆ
+            if (_showPasswordChecklist)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _expandChecklist = !_expandChecklist; // กดเพื่อขยาย/ย่อ
+                  });
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'รหัสผ่านต้องปลอดภัย (แตะเพื่อดูรายละเอียด)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    // ✅ Checklist ขยายออกเมื่อกด
+                    AnimatedCrossFade(
+                      firstChild: const SizedBox.shrink(), // ย่อ
+                      secondChild: _buildPasswordChecklist(), // ขยาย
+                      crossFadeState: _expandChecklist
+                          ? CrossFadeState.showSecond
+                          : CrossFadeState.showFirst,
+                      duration: const Duration(milliseconds: 200),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _firstNameController,
@@ -278,7 +386,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   )
                 : ElevatedButton(
-                    onPressed: _register,
+                    onPressed: () {
+                      setState(() {
+                        _showPasswordChecklist = true; // แสดง checklist
+                      });
+                      _register(); // เรียกฟังก์ชันสมัคร
+                    },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: const Color.fromARGB(185, 64, 195, 255),

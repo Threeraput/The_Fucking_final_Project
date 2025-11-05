@@ -326,7 +326,9 @@ Future<void> _captureAndProcess() async {
                 MaterialPageRoute(builder: (_) => const ClassroomHomeScreen()),
               );
             },
-            child: const Text('OK'),
+            child: const Text(
+              style: TextStyle(color: Colors.black54),
+              'OK'),
           ),
         ],
       ),
@@ -344,7 +346,11 @@ Future<void> _captureAndProcess() async {
               : 'เพิ่มรูปภาพใบหน้า');
 
     return Scaffold(
-      appBar: AppBar(title: Text(appBarTitle)),
+      appBar: AppBar(title: Text(appBarTitle),
+        backgroundColor: Colors.transparent, // ✅ โปร่งใส
+        elevation: 0, // ✅ ตัดเงาออก
+        foregroundColor: Colors.white, // ✅ เปลี่ยนสีไอคอนเป็นดำ
+      ),
       body: controller == null
           ? const Center(child: CircularProgressIndicator())
           : FutureBuilder<void>(

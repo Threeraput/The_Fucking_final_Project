@@ -83,7 +83,9 @@ class FeedService {
             classId: classId,
             type: FeedType.announcement, //  ชนิดเป็น announcement
             title: (a['title']?.isEmpty ?? true) ? 'ประกาศ' : a['title'],
-            postedAt: DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime.now(),
+            postedAt:
+                DateTime.tryParse(a['created_at']?.toString() ?? '') ??
+                DateTime.now(),
             expiresAt: a['expires_at'],
             extra: {
               'kind': 'announcement', //  ชัดเจนว่าคือประกาศ
@@ -129,30 +131,30 @@ class FeedService {
     }
 
     // ✅ เรียงลำดับ: pinned (เฉพาะประกาศ) มาก่อน แล้วค่อยเวลาล่าสุด
-   items.sort((a, b) {
-  final aKind = a.extra['kind']?.toString();
-  final bKind = b.extra['kind']?.toString();
+    items.sort((a, b) {
+      final aKind = a.extra['kind']?.toString();
+      final bKind = b.extra['kind']?.toString();
 
-  final aIsCheckin = a.type == FeedType.checkin || aKind == 'checkin';
-  final bIsCheckin = b.type == FeedType.checkin || bKind == 'checkin';
+      final aIsCheckin = a.type == FeedType.checkin || aKind == 'checkin';
+      final bIsCheckin = b.type == FeedType.checkin || bKind == 'checkin';
 
-  // 🥇 ถ้าอันใดอันหนึ่งเป็น "เช็คชื่อ" → ให้เรียงขึ้นก่อน
-  if (aIsCheckin != bIsCheckin) {
-    return aIsCheckin ? -1 : 1; // a ขึ้นก่อนถ้าเป็น checkin
-  }
+      // 🥇 ถ้าอันใดอันหนึ่งเป็น "เช็คชื่อ" → ให้เรียงขึ้นก่อน
+      if (aIsCheckin != bIsCheckin) {
+        return aIsCheckin ? -1 : 1; // a ขึ้นก่อนถ้าเป็น checkin
+      }
 
-  // 🥈 ถ้าเป็นประกาศทั้งคู่ → ให้ pinned ขึ้นก่อน
-  final aIsAnn = aKind == 'announcement';
-  final bIsAnn = bKind == 'announcement';
-  if (aIsAnn && bIsAnn) {
-    final ap = a.extra['pinned'] == true;
-    final bp = b.extra['pinned'] == true;
-    if (ap != bp) return bp ? 1 : -1; // pinned (true) มาก่อน
-  }
+      // 🥈 ถ้าเป็นประกาศทั้งคู่ → ให้ pinned ขึ้นก่อน
+      final aIsAnn = aKind == 'announcement';
+      final bIsAnn = bKind == 'announcement';
+      if (aIsAnn && bIsAnn) {
+        final ap = a.extra['pinned'] == true;
+        final bp = b.extra['pinned'] == true;
+        if (ap != bp) return bp ? 1 : -1; // pinned (true) มาก่อน
+      }
 
-  // 🥉 ที่เหลือเรียงเวลาใหม่ → เก่า
-  return b.postedAt.compareTo(a.postedAt);
-});
+      // 🥉 ที่เหลือเรียงเวลาใหม่ → เก่า
+      return b.postedAt.compareTo(a.postedAt);
+    });
 
     return items;
   }
@@ -164,13 +166,17 @@ class FeedService {
     final result = <FeedItem>[];
 
     // 1) เอาฟีดฐาน (เช็คชื่อ + ประกาศ + งานครูที่ดึงมาแล้ว แต่เราจะกรองการ์ดเช็คชื่อ)
-    final base = await getClassFeed(classId);
-    for (final f in base) {
-      // ถ้าเป็นประกาศ/งาน → ใส่ได้เลย (นักเรียนก็เห็นได้)
-      final kind = f.extra['kind']?.toString();
-      if (kind == 'announcement' || kind == 'assignment') {
-        result.add(f);
-        continue;
+    final checkins = await getClassFeed(classId);
+    for (final f in checkins) {
+      // 1) เอาฟีดฐาน (เช็คชื่อ + ประกาศ + งานครูที่ดึงมาแล้ว แต่เราจะกรองการ์ดเช็คชื่อ)
+      final base = await getClassFeed(classId);
+      for (final f in base) {
+        // ถ้าเป็นประกาศ/งาน → ใส่ได้เลย (นักเรียนก็เห็นได้)
+        final kind = f.extra['kind']?.toString();
+        if (kind == 'announcement' || kind == 'assignment') {
+          result.add(f);
+          continue;
+        }
       }
 
       // เฉพาะการ์ดเช็คชื่อ → กรองตามสถานะ

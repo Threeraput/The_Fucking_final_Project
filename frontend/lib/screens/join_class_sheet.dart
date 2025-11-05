@@ -106,7 +106,20 @@ class _JoinClassSheetState extends State<JoinClassSheet> {
                 controller: _codeCtl,
                 decoration: InputDecoration(
                   labelText: 'รหัสคลาส',
-                  border: const OutlineInputBorder(),
+                  floatingLabelStyle: const TextStyle(
+                  color: Color.fromARGB(221, 21, 96, 225), // สี label ตอนโฟกัส
+                  fontWeight: FontWeight.bold,
+                ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color.fromARGB(221, 21, 96, 225),
+                        width: 2,
+                      ),
+                    ),
                   errorText: _errorText,
                 ),
                 inputFormatters: [

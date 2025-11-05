@@ -84,7 +84,11 @@ class _StudentReverifyScreenState extends State<StudentReverifyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ยืนยันตัวตนซ้ำ (กลางคาบ)')),
+      appBar: AppBar(title: const Text('ยืนยันตัวตนซ้ำ (กลางคาบ)'),
+        backgroundColor: Colors.transparent, // ✅ โปร่งใส
+        elevation: 0, // ✅ ตัดเงาออก
+        foregroundColor: Colors.white, // ✅ เปลี่ยนสีไอคอนเป็นดำ
+      ),
       body: FutureBuilder(
         future: _init,
         builder: (_, snap) {

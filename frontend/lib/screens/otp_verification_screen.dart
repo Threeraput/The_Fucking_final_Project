@@ -1,4 +1,6 @@
 // lib/screens/otp_verification_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
@@ -13,10 +15,15 @@ class OtpVerificationScreen extends StatefulWidget {
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final int _otpLength = 6;
+  final int _otpExpireMinutes = 5;
+  late Duration _remaining;
+  Timer? _countdownTimer;
   final List<TextEditingController> _controllers = [];
   final List<FocusNode> _focusNodes = [];
   String? _message;
   bool _isLoading = false;
+
+  Color? _messageColor;
 
   @override
   void initState() {
@@ -25,13 +32,38 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       _controllers.add(TextEditingController());
       _focusNodes.add(FocusNode());
     }
+
+  _remaining = Duration(minutes: _otpExpireMinutes);
+    _startTimer();
   }
+
+  void _startTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() {
+        if (_remaining.inSeconds > 0) {
+          _remaining = _remaining - const Duration(seconds: 1);
+        } else {
+          _countdownTimer?.cancel();
+        }
+      });
+    });
+  }
+  
 
   @override
   void dispose() {
     for (var ctrl in _controllers) ctrl.dispose();
     for (var node in _focusNodes) node.dispose();
+    _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  String _formatDuration(Duration d) {
+    final mm = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final ss = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$mm:$ss';
   }
 
   void _onOtpChanged(String value, int index) {
@@ -63,15 +95,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
     try {
       await AuthService.verifyOtp(widget.email, otp);
-
+      
       setState(() {
         _message = 'OTP verified successfully! Your account is now active.';
+        _messageColor = Colors.green;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('OTP verified! Redirecting to login...')),
       );
-
+      _countdownTimer?.cancel();
       await Future.delayed(const Duration(seconds: 2));
       Navigator.of(context).pushReplacementNamed('/login');
     } catch (e) {
@@ -95,7 +128,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       await AuthService.requestOtp(widget.email);
 
       setState(() {
-        _message = 'New OTP sent to ${widget.email}.';
+        _remaining = Duration(minutes: _otpExpireMinutes);
       });
     } catch (e) {
       setState(() {
@@ -136,27 +169,41 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Verify your Email',
+              Text(
+                _remaining.inSeconds > 0
+                ? 'รหัสจะหมดอายุใน ${_formatDuration(_remaining)} (${_remaining.inMinutes + (_remaining.inSeconds%60>0?1:0)} นาที)'
+                    : 'รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: _remaining.inSeconds > 0 ? Colors.black54 : Colors.redAccent,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Enter the code sent to your inbox ${widget.email}',
+              Text('Enter the code sent to your inbox ${widget.email}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 30),
-
+              /*
+              Text(
+                _remaining.inSeconds > 0
+                    ? 'รหัสจะหมดอายุใน ${_formatDuration(_remaining)} (${_remaining.inMinutes + (_remaining.inSeconds%60>0?1:0)} นาที)'
+                    : 'รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่',
+                style: TextStyle(
+                  color: _remaining.inSeconds > 0 ? Colors.black54 : Colors.redAccent,
+                  fontSize: 13,
+                ),
+              ),
+              */
               // Row ของ 6 TextField
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_otpLength, (index) {
                   return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    width: 45,
-                    height: 55,
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    width: 43,
+                    height: 52,
                     child: TextField(
                       controller: _controllers[index],
                       focusNode: _focusNodes[index],
@@ -164,7 +211,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       showCursor: false, // ซ่อน cursor
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                       keyboardType: TextInputType.number,
@@ -247,7 +294,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
                     _message!,
-                    style: const TextStyle(color: Colors.red),
+                    style: TextStyle(color: _messageColor),
                     textAlign: TextAlign.center,
                   ),
                 ),

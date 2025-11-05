@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 // ใช้ SessionsService ให้ตรงกับส่วนอื่นของแอป
 import 'package:frontend/services/sessions_service.dart';
+import 'package:numberpicker/numberpicker.dart';
 import '../utils/location_helper.dart';
 import 'package:frontend/services/attendance_service.dart';
 
@@ -198,19 +199,89 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
 
             // หมดอายุใน (นาที)
             TextFormField(
+              readOnly: true,
               controller: _minCtl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'หมดอายุใน (นาที)',
                 border: OutlineInputBorder(),
-                helperText: 'เช่น 15, 30, 60 นาที',
+                helperText: 'เช่น 15 นาที',
+                suffixIcon: Icon(Icons.timer_outlined),
               ),
+              onTap: () async {
+              int currentValue = int.tryParse(_minCtl.text) ?? 15;
+              int tempValue = currentValue;
+
+await showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  ),
+  builder: (context) {
+    
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        top: 16,
+        left: 16,
+        right: 16,
+      ),
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('เลือกเวลาหมดอายุ (นาที)',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 180,
+                child: NumberPicker(
+                  value: tempValue,
+                  minValue: 1,
+                  maxValue: 240,
+                  onChanged: (val) => setModalState(() => tempValue = val),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      style: TextStyle(color: Colors.grey),
+                      'ยกเลิก'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                    onPressed: () {
+                      setState(() => _minCtl.text = tempValue.toString());
+                      Navigator.pop(context);
+                    },
+                    child: const Text('ตกลง'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          );
+        },
+      ),
+    );
+  },
+);
+              },
               validator: (v) => _requiredInt(v, min: 1, max: 240),
             ),
             const SizedBox(height: 12),
 
             // เวลาตัดสาย (นาทีหลังเริ่ม)
             TextFormField(
+              readOnly: true,
               controller: _lateCtl,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
@@ -218,8 +289,77 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
                 border: const OutlineInputBorder(),
                 helperText:
                     'เช่น 10 นาที (ต้องไม่เกินเวลาหมดอายุ ${_minCtl.text} นาที)',
+              suffixIcon: Icon(Icons.timer_off_outlined),
               ),
-              validator: _lateCutoffValidator,
+              onTap: () async {
+              int currentValue = int.tryParse(_lateCtl.text) ?? 15;
+              int tempValue = currentValue;
+
+await showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  ),
+  builder: (context) {
+    
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        top: 16,
+        left: 16,
+        right: 16,
+      ),
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('เลือกเวลาหมดอายุ (นาที)',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 180,
+                child: NumberPicker(
+                  value: tempValue,
+                  minValue: 1,
+                  maxValue: 240,
+                  onChanged: (val) => setModalState(() => tempValue = val),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      style: TextStyle(color: Colors.grey),
+                      'ยกเลิก'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                    onPressed: () {
+                      setState(() => _lateCtl.text = tempValue.toString());
+                      Navigator.pop(context);
+                    },
+                    child: const Text('ตกลง'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          );
+        },
+      ),
+    );
+  },
+);
+              },
+              validator: (v) => _lateCutoffValidator(v)
             ),
             const SizedBox(height: 12),
 
@@ -237,12 +377,14 @@ class _TeacherOpenCheckinSheetState extends State<TeacherOpenCheckinSheet> {
 
             const SizedBox(height: 16),
             FilledButton.icon(
+              
               onPressed: _posting ? null : _open,
               icon: const Icon(Icons.play_circle_outline),
               label: _posting
                   ? const Text('กำลังเปิด...')
                   : const Text('เริ่มเช็คชื่อ'),
               style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
                 minimumSize: const Size.fromHeight(44),
               ),
             ),

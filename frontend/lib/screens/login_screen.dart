@@ -57,7 +57,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  title: const Text('ยืนยันการบันทึกภาพใบหน้า'),
+                  title: const Text(
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    'ยืนยันการบันทึกภาพใบหน้า'),
                   content: const Text(
                     'คุณยังไม่ได้ลงทะเบียนใบหน้าในระบบ\n'
                     'ต้องการลงทะเบียนตอนนี้หรือไม่?',
@@ -65,9 +67,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('ภายหลัง'),
+                      child: const Text(
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14) ,
+                        'ภายหลัง'),
                     ),
                     FilledButton(
+                      style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      ),
                       onPressed: () => Navigator.pop(context, true),
                       child: const Text('ลงทะเบียนตอนนี้'),
                     ),

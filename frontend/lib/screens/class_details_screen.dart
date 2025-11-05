@@ -91,14 +91,24 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 28, 178, 248),
+            
+          ))
           : _error
           ? const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'))
           : _buildBody(),
       floatingActionButton: _currentIndex == 1 && _isTeacher
           ? FloatingActionButton.extended(
-              icon: const Icon(Icons.add),
-              label: const Text('เพิ่มงาน'),
+            backgroundColor: Colors.blueAccent,
+              icon: const Icon(
+                color: Colors.white,
+                Icons.add),
+              label: const Text(
+                style: TextStyle(
+                  color: Colors.white
+                ),
+                'เพิ่มงาน'),
               onPressed: () async {
                 final ok = await Navigator.pushNamed(
                   context,
@@ -261,12 +271,17 @@ class _StreamTabState extends State<_StreamTab> {
                   children: [
                     Text(
                       c.name ?? '—',
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 8),
                     Text('Code: ${c.code ?? '-'}'),
                     const SizedBox(height: 4),
                     Text(
+                      style: const TextStyle(color: Colors.white70),
                       'Teacher: ${c.teacher?.username ?? c.teacher?.email ?? '-'}',
                     ),
                     if ((c.description ?? '').isNotEmpty) ...[
@@ -284,11 +299,16 @@ class _StreamTabState extends State<_StreamTab> {
               icon: const Icon(Icons.campaign),
               label: const Text('Create Announcement'),
               style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.black38, // สีข้อความและไอคอน
                 minimumSize: const Size.fromHeight(44),
               ),
             ),
             const SizedBox(height: 8),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.blueAccent, // สีพื้นหลัง
+                minimumSize: const Size.fromHeight(44),
+              ),
               onPressed: () async {
                 final created =
                     await showModalBottomSheet<Map<String, dynamic>?>(
@@ -322,7 +342,9 @@ class _StreamTabState extends State<_StreamTab> {
               if (snap.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: CircularProgressIndicator(
+                    color: Color.fromARGB(255, 28, 178, 248),
+                  )),
                 );
               }
               if (snap.hasError) {
@@ -385,7 +407,9 @@ void initState() {
         future: _futureAssignments,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(
+               color: Color.fromARGB(255, 28, 178, 248),
+            ));
           }
           if (snap.hasError) {
             return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));

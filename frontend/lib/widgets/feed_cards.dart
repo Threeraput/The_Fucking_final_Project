@@ -7,7 +7,6 @@ import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/utils/location_helper.dart';
 import 'package:frontend/services/announcement_service.dart';
 
-
 // ✅ การ์ด assignment
 import 'package:frontend/widgets/assignment_card.dart';
 
@@ -26,7 +25,7 @@ class FeedList extends StatelessWidget {
   });
 
   @override
-Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     if (items.isEmpty) {
       return Card(
         margin: const EdgeInsets.only(top: 8),
@@ -108,6 +107,7 @@ class _FeedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final extra = Map<String, dynamic>.from(item.extra ?? {});
+
     final kind = (extra['kind']?.toString().toLowerCase() ?? '');
 
     // ✅ ถ้า backend ยังไม่ใส่ kind ให้ใช้ item.type เป็น fallback
@@ -128,8 +128,8 @@ class _FeedCard extends StatelessWidget {
           isTeacher: isTeacher,
           onChanged: onChanged,
         );
-
-   case 'announcement':
+      // ✅ สามารถขยายในอนาคต เช่น case 'announcement', 'quiz' ได้
+      case 'announcement':
         // 🔹 strip prefix "ann:" ออก ถ้ามี
         final rawId = item.id ?? '';
         final annId = rawId.startsWith('ann:') ? rawId.split(':').last : rawId;
@@ -147,11 +147,12 @@ class _FeedCard extends StatelessWidget {
         );
 
       default:
+        // ✅ ค่าเริ่มต้น: การ์ดเช็คชื่อ (เดิม)
         return _buildCheckinCard(context);
     }
   }
 
-  /// ===== การ์ดเช็คชื่อ =====
+  /// ===== การ์ดเช็คชื่อ (เดิม) =====
   Widget _buildCheckinCard(BuildContext context) {
     final dfTime = DateFormat('d MMM, HH:mm');
     final expText = item.expiresAt != null
@@ -249,25 +250,60 @@ class _FeedCard extends StatelessWidget {
               dateText: dfTime.format(item.postedAt.toLocal()),
             ),
             const SizedBox(height: 8),
-            Text(
-              '$titleกำลังเปิดอยู่',
-              style: Theme.of(context).textTheme.titleMedium,
+
+            // RichText สำหรับ expText และ radius
+            RichText(
+              text: TextSpan(
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontSize: 14),
+                children: [
+                  TextSpan(text: '$expText · '),
+                  const TextSpan(
+                    text: 'รัศมี ',
+                    style: TextStyle(fontSize: 15),
+                  ),
+                  TextSpan(
+                    text: '${radius ?? '-'} m',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '$expText · รัศมี ${radius ?? '-'} m',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+
+            const SizedBox(height: 3),
+
+            // แสดง Anchor
             if (lat != null && lon != null)
               Text(
                 'Anchor: $lat, $lon',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            Text(
-              'Reverify: ${reverifyEnabled ? "ON" : "OFF"}',
-              style: Theme.of(context).textTheme.bodySmall,
+
+            const SizedBox(height: 3),
+
+            // แสดง Reverify (ON/OFF)
+            RichText(
+              text: TextSpan(
+                style: Theme.of(context).textTheme.bodySmall,
+                children: [
+                  const TextSpan(text: 'Reverify: '),
+                  TextSpan(
+                    text: reverifyEnabled ? 'ON' : 'OFF',
+                    style: TextStyle(
+                      color: reverifyEnabled ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
+
             const SizedBox(height: 8),
+
             Row(children: [trailing]),
           ],
         ),
@@ -283,26 +319,44 @@ class _FeedCard extends StatelessWidget {
     required bool canReverify,
   }) {
     if (isTeacher) {
+      // ปุ่มสำหรับครู: toggle reverify
+      final isEnabled = item.extra['reverify_enabled'] == true;
+
       return OutlinedButton(
-        onPressed: sessionId == null
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white, // สีตัวอักษร
+          backgroundColor: isEnabled
+              ? Colors.green
+              : Colors.red, // ✅ เปิด=เขียว, ปิด=แดง
+          side: BorderSide(
+            color: isEnabled ? Colors.green : Colors.red,
+          ), // เส้นขอบตามสี
+        ),
+        onPressed: (sessionId == null)
             ? null
             : () async {
                 try {
-                  final next = !(item.extra['reverify_enabled'] == true);
-                  final enabled = await SessionsService.toggleReverify(
+                  final next = !isEnabled; // toggle สถานะใหม่
+                  final newEnabled = await SessionsService.toggleReverify(
                     sessionId: sessionId,
                     enabled: next,
                   );
+
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          enabled ? 'เปิด reverify แล้ว' : 'ปิด reverify แล้ว',
+                          newEnabled
+                              ? 'เปิด reverify แล้ว'
+                              : 'ปิด reverify แล้ว',
+                          style: const TextStyle(color: Colors.black),
                         ),
+                        behavior: SnackBarBehavior.floating,
                       ),
                     );
                   }
-                  onChanged?.call();
+
+                  onChanged?.call(); // reload UI
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -312,9 +366,10 @@ class _FeedCard extends StatelessWidget {
                 }
               },
         child: Text(
-          item.extra['reverify_enabled'] == true
-              ? 'ปิด reverify'
-              : 'เปิด reverify',
+          isEnabled ? 'ปิด reverify' : 'เปิด reverify',
+          style: const TextStyle(
+            color: Colors.white,
+          ), // ✅ ตัวอักษรสีขาวบนปุ่มสีเข้ม
         ),
       );
     }
@@ -327,6 +382,7 @@ class _FeedCard extends StatelessWidget {
     if (!hasCheckedIn) {
       buttons.add(
         FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: Colors.blue),
           onPressed: () async {
             final ok = await Navigator.push(
               context,
@@ -386,8 +442,10 @@ class _FeedCard extends StatelessWidget {
                     }
                   }
                 : null,
-            icon: const Icon(Icons.verified_user_outlined),
-            label: Text(isReverified ? 'ยืนยันแล้ว' : 'ยืนยันซ้ำ'),
+            label: Text(
+              style: TextStyle(color: Colors.black),
+              isReverified ? 'ยืนยันแล้ว' : 'ยืนยันซ้ำ',
+            ),
           );
         },
       ),
@@ -415,8 +473,8 @@ class _HeaderRow extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Icon(icon, size: 18, color: color),
+          backgroundColor: Colors.blue,
+          child: Icon(icon, size: 18, color: Colors.white),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -489,17 +547,17 @@ class _AnnouncementCard extends StatelessWidget {
                 ),
               ),
 
-            // 🔹 เพิ่มปุ่มแก้ไข / ลบ สำหรับครูเท่านั้น
+            // 🔹 เพิ่มเมนู 3 จุด สำหรับครูเท่านั้น
             if (isTeacher)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      tooltip: 'แก้ไขประกาศ',
-                      onPressed: () async {
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: Colors.grey),
+                    onSelected: (value) async {
+                      if (value == 'edit') {
+                        // ---------- ฟังก์ชันแก้ไข ----------
                         final titleCtrl = TextEditingController(text: title);
                         final bodyCtrl = TextEditingController(text: body);
 
@@ -529,9 +587,15 @@ class _AnnouncementCard extends StatelessWidget {
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('ยกเลิก'),
+                                child: const Text(
+                                  'ยกเลิก',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
                               ),
                               ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blueAccent,
+                                ),
                                 onPressed: () => Navigator.pop(ctx, true),
                                 child: const Text('บันทึก'),
                               ),
@@ -562,34 +626,37 @@ class _AnnouncementCard extends StatelessWidget {
                             }
                           }
                         }
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      tooltip: 'ลบประกาศ',
-                      onPressed: () async {
+                      } else if (value == 'delete') {
+                        // ---------- ฟังก์ชันลบ ----------
                         final ok = await showDialog<bool>(
                           context: context,
-                          builder: (_) => AlertDialog(
+                          builder: (ctx) => AlertDialog(
                             title: const Text('ยืนยันการลบ'),
                             content: const Text(
-                              'คุณแน่ใจหรือไม่ที่จะลบประกาศนี้?',
+                              'คุณแน่ใจหรือไม่ว่าจะลบประกาศนี้?',
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('ยกเลิก'),
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text(
+                                  'ยกเลิก',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
                                 child: const Text(
                                   'ลบ',
-                                  style: TextStyle(color: Colors.red),
+                                  style: TextStyle(color: Colors.white),
                                 ),
                               ),
                             ],
                           ),
                         );
+
                         if (ok == true) {
                           try {
                             await AnnouncementService.delete(announcementId);
@@ -607,9 +674,31 @@ class _AnnouncementCard extends StatelessWidget {
                             }
                           }
                         }
-                      },
-                    ),
-                  ],
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, color: Colors.blueAccent),
+                            SizedBox(width: 8),
+                            Text('แก้ไข'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('ลบ'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],

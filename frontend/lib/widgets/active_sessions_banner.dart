@@ -1,6 +1,7 @@
 // lib/widgets/active_sessions_banner.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/student_class_view.dart';
 import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
@@ -171,6 +172,14 @@ class _SessionRow extends StatelessWidget {
                 children: [
                   OutlinedButton(
                     // ✅ เอา notExpired ออก ถ้าอยากให้กดได้ตลอด (เหลือแค่เช็คว่ามี sessionId)
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: reverifyEnabled ? Colors.green : Colors.red, // สีพื้นตามสถานะ
+                    foregroundColor: Colors.white, // สีตัวอักษร
+                    side: BorderSide(
+                    color: reverifyEnabled ? Colors.green : Colors.red, // สีขอบ
+                    width: 1.5,
+                      ),
+                    ),
                     onPressed: (sessionId != null)
                         ? () async {
                             try {
@@ -185,9 +194,12 @@ class _SessionRow extends StatelessWidget {
                                   SnackBar(
                                     content: Text(
                                       enabled
+                                        
                                           ? 'เปิด reverify แล้ว'
                                           : 'ปิด reverify แล้ว',
+                                      style: const TextStyle(color: Colors.black),
                                     ),
+                                   behavior: SnackBarBehavior.floating, // ทำให้มันลอยสวยขึ้น (optional)
                                   ),
                                 );
                               }
@@ -207,6 +219,7 @@ class _SessionRow extends StatelessWidget {
                         : null, // ไม่มี sessionId -> ปิดปุ่ม
                     child: Text(
                       reverifyEnabled ? 'ปิด reverify' : 'เปิด reverify',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],

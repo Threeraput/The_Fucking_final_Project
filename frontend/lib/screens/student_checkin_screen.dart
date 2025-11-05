@@ -127,13 +127,46 @@ class _StudentCheckinScreenState extends State<StudentCheckinScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      // ignore: avoid_print
-      print('🧩 [StudentCheckinScreen] error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
+
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      print('🧩 [StudentCheckinScreen] error: $msg');
+
+      // ✅ ตรวจว่ามีคำว่า 403 หรือข้อความที่เกี่ยวกับรัศมี
+      if (msg.contains('403') ||
+          msg.contains('นอกระยะ') ||
+          msg.contains('รัศมี')) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text(
+              'อยู่นอกรัศมีที่กำหนด',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: const Text(
+              'คุณอยู่นอกพื้นที่ที่อาจารย์กำหนดไว้สำหรับการเช็คชื่อ\n'
+              'กรุณาเข้าใกล้พื้นที่ที่กำหนดและลองใหม่อีกครั้ง',
+            ),
+            actions: [
+              TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.blueAccent
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  style: TextStyle(
+                    color: Colors.white
+                  ),
+                  'ตกลง'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // 🧩 Error อื่น ๆ แสดง SnackBar ตามปกติ
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
+      }
     }
   }
 
@@ -178,10 +211,10 @@ class _StudentCheckinScreenState extends State<StudentCheckinScreen> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(44),
-              ),
+                      backgroundColor: Colors.blueAccent,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
                     onPressed: _busy ? null : _checkIn,
                     icon: _busy
                         ? const SizedBox(
