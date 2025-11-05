@@ -14,3 +14,9 @@ from .teacher_location import TeacherLocation
 from .student_location import StudentLocation
 from .classwork_assignment import ClassworkAssignment
 from .classwork_submission import ClassworkSubmission
+from .announcement import Announcement
+from .attendance_report import AttendanceReport 
+from .otp import OTP
+from .attendance_session import AttendanceSession
+from .classwork_enums import SubmissionLateness
+
