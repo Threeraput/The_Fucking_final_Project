@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
+import 'package:frontend/screens/class_report_tab.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_announcement_screen.dart';
 import 'package:frontend/screens/teacher_open_checkin_sheet.dart';
@@ -10,6 +11,7 @@ import 'package:frontend/services/feed_service.dart';
 import 'package:frontend/widgets/feed_cards.dart';
 import 'package:frontend/models/feed_item.dart';
 import 'package:intl/intl.dart';
+
 
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
@@ -64,24 +66,24 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   }
 
   Future<void> _openCreateAnnouncement() async {
-  final ok = await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => CreateAnnouncementScreen(
-        classId: widget.classId,
-        className: _classroom?.name ?? widget.className ?? 'Class',
+    final ok = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateAnnouncementScreen(
+          classId: widget.classId,
+          className: _classroom?.name ?? widget.className ?? 'Class',
+        ),
       ),
-    ),
-  );
-
-  // ✅ ถ้าโพสต์สำเร็จ แค่รีเฟรชฟีดพอ ไม่ต้องถามเปิดเช็คชื่อ
-  if (ok == true && mounted) {
-    _streamKey.currentState?.refreshFeed();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('สร้างประกาศสำเร็จ')),
     );
+
+    //  ถ้าโพสต์สำเร็จ แค่รีเฟรชฟีดพอ
+    if (ok == true && mounted) {
+      _streamKey.currentState?.refreshFeed();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('สร้างประกาศสำเร็จ')));
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +109,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
               },
             )
           : null,
+
+      //  Bottom Navigation Bar เหมือนเดิม
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         selectedItemColor: Colors.blueAccent,
@@ -125,7 +129,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_outlined),
-            label: 'Report',
+            label: 'Report', // ✅ หน้ารายงานใหม่
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people_outline),
@@ -149,7 +153,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
       case 1:
         return _ClassworkTab(classId: widget.classId, isTeacher: _isTeacher);
       case 2:
-        return const _ReportTab();
+        //  แท็บรายงานจริง
+        return ClassReportTab(classId: widget.classId);
       case 3:
         return _PeopleTab(classroom: _classroom);
       default:

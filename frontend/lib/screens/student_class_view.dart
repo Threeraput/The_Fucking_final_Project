@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
-
+import 'package:frontend/screens/student_report_tab.dart';
 class StudentClassView extends StatefulWidget {
   final String classId; // <- ต้องเป็น UUID ของคลาส
   final String className;
@@ -77,7 +77,7 @@ class _StudentClassViewState extends State<StudentClassView> {
         classId: widget.classId,
       );
     case 2:
-      return const _StudentReportTab();
+      return const StudentReportTab();
     case 3:
       return _StudentPeopleTab(teacherName: widget.teacherName);
     default:
