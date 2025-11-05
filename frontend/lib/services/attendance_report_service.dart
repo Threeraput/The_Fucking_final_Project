@@ -63,12 +63,30 @@ class AttendanceReportService {
     final url = Uri.parse('$baseUrl/attendance/reports/my-report');
     try {
       final res = await _get(url, token);
-      // ฝั่งหลังบ้านอาจ 404 ถ้ายังไม่เคย generate → คืนลิสต์ว่าง
-      return _parseList<AttendanceReport>(
-        res,
-        (m) => AttendanceReport.fromJson(m),
-        emptyOn404: true,
-      );
+
+      // ✅ รองรับทุกเคสแบบไม่ทำให้ UI ล้ม
+      if (res.statusCode == 200) {
+        final raw = json.decode(res.body);
+        if (raw is List) {
+          return raw
+              .map<AttendanceReport>(
+                (e) => AttendanceReport.fromJson(e as Map<String, dynamic>),
+              )
+              .toList();
+        } else {
+          throw Exception('Unexpected payload (not a list): ${res.body}');
+        }
+      }
+
+      // ยังไม่ generate หรือ backend พัง → คืนลิสต์ว่างให้ UI แทน
+      if (res.statusCode == 404 ||
+          res.statusCode == 500 ||
+          res.statusCode == 204) {
+        return <AttendanceReport>[];
+      }
+
+      // อย่างอื่นให้เด้งขึ้น (จะมีข้อความแจ้ง)
+      throw Exception('HTTP ${res.statusCode}: ${res.body}');
     } on SocketException {
       throw Exception('Network error while fetching my reports');
     }
@@ -184,6 +202,16 @@ class AttendanceReportService {
     final url = Uri.parse('$baseUrl/attendance/reports/class/$classId/summary');
     try {
       final res = await _get(url, token);
+
+      // ✅ ถ้ายังไม่เคย generate → 404 → คืน summary ว่าง
+      if (res.statusCode == 404) {
+        return {
+          'total_students': 0,
+          'average_attendance_rate': 0.0,
+          'total_sessions': 0,
+        };
+      }
+
       return _parseMap(res);
     } on SocketException {
       throw Exception('Network error while fetching class summary');

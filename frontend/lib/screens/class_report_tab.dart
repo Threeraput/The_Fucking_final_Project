@@ -4,6 +4,10 @@ import 'package:frontend/models/attendance_report_detail.dart';
 import 'package:frontend/services/attendance_report_service.dart';
 import 'package:intl/intl.dart';
 
+// เพิ่ม: ใช้ข้อมูลสมาชิกคลาสเพื่อ map studentId -> ชื่อผู้ใช้
+import 'package:frontend/services/class_service.dart';
+import 'package:frontend/models/users.dart';
+
 class ClassReportTab extends StatefulWidget {
   final String classId;
 
@@ -20,6 +24,9 @@ class _ClassReportTabState extends State<ClassReportTab> {
 
   List<AttendanceReport> _reports = [];
   Map<String, dynamic>? _summary;
+
+  // เพิ่ม: ดัชนีเก็บข้อมูลผู้ใช้ของนักเรียนในคลาสนี้
+  final Map<String, User> _userIndex = {};
 
   @override
   void initState() {
@@ -41,6 +48,16 @@ class _ClassReportTabState extends State<ClassReportTab> {
         widget.classId,
       );
 
+      // โหลดรายชื่อสมาชิกในคลาส (เพื่อแปลง studentId -> ชื่อ)
+      try {
+        final cls = await ClassService.getClassroomDetails(widget.classId);
+        for (final u in cls.students) {
+          _userIndex[u.userId] = u;
+        }
+      } catch (_) {
+        // ถ้าดึงไม่ได้ ให้ปล่อยผ่าน ใช้ studentId เป็น fallback
+      }
+
       setState(() {
         _reports = reports;
         _summary = summary;
@@ -53,6 +70,20 @@ class _ClassReportTabState extends State<ClassReportTab> {
         _loading = false;
       });
     }
+  }
+
+  // แปลง studentId -> ชื่อที่สวยงาม (first last > username > email > studentId)
+  String _displayName(String studentId) {
+    final u = _userIndex[studentId];
+    if (u != null) {
+      final fn = (u.firstName ?? '').trim();
+      final ln = (u.lastName ?? '').trim();
+      final full = [fn, ln].where((s) => s.isNotEmpty).join(' ');
+      if (full.isNotEmpty) return full;
+      if ((u.username).isNotEmpty) return u.username;
+      if ((u.email ?? '').isNotEmpty) return u.email!;
+    }
+    return studentId;
   }
 
   Future<void> _generateReport() async {
@@ -221,6 +252,7 @@ class _ClassReportTabState extends State<ClassReportTab> {
   Widget _buildStudentReportCard(AttendanceReport report) {
     final rate = report.attendanceRate;
     final color = _getAttendanceColor(rate);
+    final name = _displayName(report.studentId);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -243,8 +275,9 @@ class _ClassReportTabState extends State<ClassReportTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // เปลี่ยนจาก Student ID -> แสดงชื่อ
                         Text(
-                          'Student ID: ${report.studentId}',
+                          'นักเรียน: $name',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -342,6 +375,8 @@ class _ClassReportTabState extends State<ClassReportTab> {
   }
 
   void _showDetailDialog(AttendanceReport report) {
+    final name = _displayName(report.studentId);
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -356,7 +391,8 @@ class _ClassReportTabState extends State<ClassReportTab> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const Divider(height: 24),
-              _buildDetailRow('Student ID', report.studentId),
+              // เปลี่ยนให้เห็นชื่อแทนรหัส
+              _buildDetailRow('นักเรียน', name),
               _buildDetailRow('ทั้งหมด', '${report.totalSessions} ครั้ง'),
               _buildDetailRow('เข้าเรียน', '${report.attendedSessions} ครั้ง'),
               _buildDetailRow('สาย', '${report.lateSessions} ครั้ง'),
@@ -392,7 +428,14 @@ class _ClassReportTabState extends State<ClassReportTab> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );

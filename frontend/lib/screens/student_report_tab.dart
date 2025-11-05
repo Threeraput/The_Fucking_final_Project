@@ -4,6 +4,9 @@ import 'package:frontend/models/attendance_report_detail.dart';
 import 'package:frontend/services/attendance_report_service.dart';
 import 'package:intl/intl.dart';
 
+// เพิ่ม: ใช้บริการคลาสเพื่อแปลง classId -> className
+import 'package:frontend/services/class_service.dart';
+
 class StudentReportTab extends StatefulWidget {
   const StudentReportTab({super.key});
 
@@ -18,6 +21,9 @@ class _StudentReportTabState extends State<StudentReportTab> {
 
   List<AttendanceReport> _myReports = [];
   List<AttendanceReportDetail> _myDailyReports = [];
+
+  // แผนที่ classId -> className เพื่อแสดงชื่อห้องแทน id
+  final Map<String, String> _classNameById = {};
 
   @override
   void initState() {
@@ -35,6 +41,19 @@ class _StudentReportTabState extends State<StudentReportTab> {
       final reports = await AttendanceReportService.getMyReports();
       final dailyReports = await AttendanceReportService.getMyDailyReports();
 
+      // โหลดรายชื่อคลาสที่นักเรียนอยู่ เพื่อ map classId -> className
+      try {
+        final joined = await ClassService.getJoinedClasses();
+        for (final c in joined) {
+          final cid = c.classId;
+          if (cid != null && cid.isNotEmpty) {
+            _classNameById[cid] = (c.name ?? c.code ?? cid);
+          }
+        }
+      } catch (_) {
+        // ถ้าดึงไม่ได้ ให้ fallback แสดง classId
+      }
+
       setState(() {
         _myReports = reports;
         _myDailyReports = dailyReports;
@@ -47,6 +66,11 @@ class _StudentReportTabState extends State<StudentReportTab> {
         _loading = false;
       });
     }
+  }
+
+  // helper: แปลง classId เป็นชื่อคลาส (fallback เป็น id ถ้าไม่พบ)
+  String _className(String classId) {
+    return _classNameById[classId] ?? classId;
   }
 
   @override
@@ -123,7 +147,7 @@ class _StudentReportTabState extends State<StudentReportTab> {
           ),
           const SizedBox(height: 16),
 
-          // การ์ดสรุปแต่ละวิชา
+          // การ์ดสรุปแต่ละวิชา (แสดงชื่อคลาสแทน classId)
           ..._myReports.map((report) => _buildReportCard(report)),
 
           const SizedBox(height: 24),
@@ -147,6 +171,7 @@ class _StudentReportTabState extends State<StudentReportTab> {
   Widget _buildReportCard(AttendanceReport report) {
     final rate = report.attendanceRate;
     final color = _getAttendanceColor(rate);
+    final className = _className(report.classId);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -176,8 +201,9 @@ class _StudentReportTabState extends State<StudentReportTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // แสดงชื่อคลาสแทน classId
                         Text(
-                          'Class ID: ${report.classId}',
+                          'วิชา: $className',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -368,7 +394,8 @@ class _StudentReportTabState extends State<StudentReportTab> {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Session ID: ${detail.sessionId}'),
+            // เดิม: แสดง Session ID / เวลา
+            // ถ้าต้องการเพิ่มชื่อคลาสตรงนี้ ต้องมีข้อมูล mapping รายวันของ session -> classId -> className จาก backend
             if (detail.checkInTime != null)
               Text('เวลา: ${_formatDateTime(detail.checkInTime!)}'),
             if (detail.isReverified)
@@ -416,6 +443,8 @@ class _StudentReportTabState extends State<StudentReportTab> {
   }
 
   void _showDetailDialog(AttendanceReport report) {
+    final className = _className(report.classId);
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -441,7 +470,8 @@ class _StudentReportTabState extends State<StudentReportTab> {
                 ],
               ),
               const Divider(height: 24),
-              _buildDetailRow('Class ID', report.classId),
+              // เปลี่ยนเป็นชื่อคลาสแทน classId
+              _buildDetailRow('วิชา', className),
               _buildDetailRow('ทั้งหมด', '${report.totalSessions} ครั้ง'),
               _buildDetailRow(
                 'เข้าเรียน',
