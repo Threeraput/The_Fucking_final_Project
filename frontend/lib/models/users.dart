@@ -12,6 +12,9 @@ class User {
   final String? lastLoginAt;
   final List<String> roles;
 
+  // สำหรับ API ล่าสุด (รองรับ full_name จาก backend, ถ้ามี)
+  final String? fullName;
+
   User({
     required this.userId,
     required this.username,
@@ -20,6 +23,7 @@ class User {
     this.email,
     this.studentId,
     this.teacherId,
+    this.fullName,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -29,18 +33,24 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      userId: json['user_id'],
-      username: json['username'],
-      firstName: json['first_name'],
-      lastName: json['last_name'],
-      email: json['email'],
-      studentId: json['student_id'],
-      teacherId: json['teacher_id'],
-      isActive: json['is_active'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-      lastLoginAt: json['last_login_at'],
-      roles: List<String>.from(json['roles']),
+      userId: (json['user_id'] ?? json['userId'] ?? '').toString(),
+      username: (json['username'] ?? '').toString(),
+      firstName: json['first_name']?.toString(),
+      lastName: json['last_name']?.toString(),
+      email: json['email']?.toString(),
+      studentId: json['student_id']?.toString(),
+      teacherId: json['teacher_id']?.toString(),
+      fullName: json['full_name']
+          ?.toString(), // เพิ่มสำหรับ API รายชื่อ friends
+      isActive: json['is_active'] is bool
+          ? json['is_active']
+          : (json['is_active'] == true || json['is_active'] == 'true'),
+      createdAt: (json['created_at'] ?? '').toString(),
+      updatedAt: (json['updated_at'] ?? '').toString(),
+      lastLoginAt: json['last_login_at']?.toString(),
+      roles: (json['roles'] is List)
+          ? List<String>.from(json['roles'] as List)
+          : <String>[],
     );
   }
 
@@ -53,11 +63,24 @@ class User {
       'email': email,
       'student_id': studentId,
       'teacher_id': teacherId,
+      'full_name': fullName,
       'is_active': isActive,
       'created_at': createdAt,
       'updated_at': updatedAt,
       'last_login_at': lastLoginAt,
       'roles': roles,
     };
+  }
+
+  /// ใช้เพื่อแสดงชื่อที่เหมาะสม เช่น บนหน้า People
+  String get displayName {
+    if ((fullName ?? '').trim().isNotEmpty) return fullName!.trim();
+    final fn = (firstName ?? '').trim();
+    final ln = (lastName ?? '').trim();
+    if (fn.isNotEmpty || ln.isNotEmpty)
+      return [fn, ln].where((s) => s.isNotEmpty).join(' ');
+    if (username.isNotEmpty) return username;
+    if ((email ?? '').isNotEmpty) return email!;
+    return userId;
   }
 }

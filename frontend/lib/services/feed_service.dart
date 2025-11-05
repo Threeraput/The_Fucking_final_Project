@@ -29,6 +29,18 @@ bool _truthy(Map<String, dynamic>? m, List<String> keys) {
   return false;
 }
 
+// ✅ ช่วย dedupe โดยใช้ id+kind เป็นกุญแจ
+List<FeedItem> _uniqByIdKind(Iterable<FeedItem> items) {
+  final seen = <String>{};
+  final out = <FeedItem>[];
+  for (final it in items) {
+    final kind = it.extra['kind']?.toString() ?? it.type.toString();
+    final key = '${it.id}|$kind';
+    if (seen.add(key)) out.add(it);
+  }
+  return out;
+}
+
 class FeedService {
   /// ✅ ดึงฟีดพื้นฐาน (เช็คชื่อ) + ✅ รวม "ประกาศ" + ✅ ต่อท้าย "งาน (ครู)"
   static Future<List<FeedItem>> getClassFeed(String classId) async {
@@ -65,6 +77,7 @@ class FeedService {
               'radius': s['radius_meters'],
               'anchor_lat': s['anchor_lat'],
               'anchor_lon': s['anchor_lon'],
+              'kind': 'checkin',
             },
           ),
         );
@@ -73,7 +86,7 @@ class FeedService {
       print('⚠️ โหลด session feed ไม่สำเร็จ: $e');
     }
 
-    // 2) ✅ ประกาศ (announcements) — ใช้ extra.kind = 'announcement' (ไม่เพิ่ม enum ใหม่)
+    // 2) ✅ ประกาศ (announcements)
     try {
       final anns = await AnnouncementService.listByClassId(classId);
       for (final a in anns) {
@@ -81,14 +94,14 @@ class FeedService {
           FeedItem(
             id: 'ann:${a['announcement_id']}',
             classId: classId,
-            type: FeedType.announcement, //  ชนิดเป็น announcement
+            type: FeedType.announcement,
             title: (a['title']?.isEmpty ?? true) ? 'ประกาศ' : a['title'],
             postedAt:
                 DateTime.tryParse(a['created_at']?.toString() ?? '') ??
                 DateTime.now(),
             expiresAt: a['expires_at'],
             extra: {
-              'kind': 'announcement', //  ชัดเจนว่าคือประกาศ
+              'kind': 'announcement',
               'body': a['body'],
               'pinned': a['pinned'],
               'visible': a['visible'],
@@ -130,7 +143,7 @@ class FeedService {
       print('⚠️ โหลด assignments (ครู) ไม่สำเร็จ: $e');
     }
 
-    // ✅ เรียงลำดับ: pinned (เฉพาะประกาศ) มาก่อน แล้วค่อยเวลาล่าสุด
+    // ✅ เรียงลำดับ
     items.sort((a, b) {
       final aKind = a.extra['kind']?.toString();
       final bKind = b.extra['kind']?.toString();
@@ -138,21 +151,16 @@ class FeedService {
       final aIsCheckin = a.type == FeedType.checkin || aKind == 'checkin';
       final bIsCheckin = b.type == FeedType.checkin || bKind == 'checkin';
 
-      // 🥇 ถ้าอันใดอันหนึ่งเป็น "เช็คชื่อ" → ให้เรียงขึ้นก่อน
       if (aIsCheckin != bIsCheckin) {
-        return aIsCheckin ? -1 : 1; // a ขึ้นก่อนถ้าเป็น checkin
+        return aIsCheckin ? -1 : 1;
       }
-
-      // 🥈 ถ้าเป็นประกาศทั้งคู่ → ให้ pinned ขึ้นก่อน
       final aIsAnn = aKind == 'announcement';
       final bIsAnn = bKind == 'announcement';
       if (aIsAnn && bIsAnn) {
         final ap = a.extra['pinned'] == true;
         final bp = b.extra['pinned'] == true;
-        if (ap != bp) return bp ? 1 : -1; // pinned (true) มาก่อน
+        if (ap != bp) return bp ? 1 : -1;
       }
-
-      // 🥉 ที่เหลือเรียงเวลาใหม่ → เก่า
       return b.postedAt.compareTo(a.postedAt);
     });
 
@@ -165,31 +173,28 @@ class FeedService {
   ) async {
     final result = <FeedItem>[];
 
-    // 1) เอาฟีดฐาน (เช็คชื่อ + ประกาศ + งานครูที่ดึงมาแล้ว แต่เราจะกรองการ์ดเช็คชื่อ)
-    final checkins = await getClassFeed(classId);
-    for (final f in checkins) {
-      // 1) เอาฟีดฐาน (เช็คชื่อ + ประกาศ + งานครูที่ดึงมาแล้ว แต่เราจะกรองการ์ดเช็คชื่อ)
-      final base = await getClassFeed(classId);
-      for (final f in base) {
-        // ถ้าเป็นประกาศ/งาน → ใส่ได้เลย (นักเรียนก็เห็นได้)
-        final kind = f.extra['kind']?.toString();
-        if (kind == 'announcement' || kind == 'assignment') {
-          result.add(f);
-          continue;
-        }
-      }
+    // ✳️ ดึง base แค่ครั้งเดียว
+    final base = await getClassFeed(classId);
 
-      // เฉพาะการ์ดเช็คชื่อ → กรองตามสถานะ
-      if (f.type != FeedType.checkin) {
+    // 1) รวม "ประกาศ" จาก base ครั้งเดียว
+    for (final f in base) {
+      final kind = f.extra['kind']?.toString();
+      if (kind == 'announcement') {
         result.add(f);
-        continue;
       }
+    }
+
+    // 2) รวม "เช็คชื่อ" ที่ยังต้องแสดง (ยังไม่ตรวจครบ)
+    final checkins = base.where((f) {
+      final kind = f.extra['kind']?.toString();
+      return f.type == FeedType.checkin || kind == 'checkin';
+    });
+    for (final f in checkins) {
       final sid = f.extra['session_id']?.toString();
       if (sid == null || sid.isEmpty) {
         result.add(f);
         continue;
       }
-
       try {
         final status = await AttendanceService.getMyStatusForSession(sid);
         final hasCheckedIn = _truthy(status, [
@@ -204,7 +209,7 @@ class FeedService {
           'reverified',
         ]);
 
-        // 🔍 ซ่อนถ้าเช็คชื่อ + reverify แล้ว
+        // แสดงเฉพาะกรณีที่ยังไม่ครบขั้นตอน
         if (!(hasCheckedIn && reverifyCompleted)) {
           result.add(f);
         }
@@ -213,7 +218,7 @@ class FeedService {
       }
     }
 
-    // 2) เพิ่ม “งานของนักเรียน” (สถานะของฉัน)
+    // 3) เพิ่ม “งานของนักเรียน” (สถานะของฉัน) — ไม่ต้องดึงงานครูซ้ำอีก
     try {
       final list = await ClassworkSimpleService.getStudentAssignmentsTyped(
         classId,
@@ -244,8 +249,11 @@ class FeedService {
       print('⚠️ โหลด assignments (นักเรียน) ไม่สำเร็จ: $e');
     }
 
-    // ✅ เรียงลำดับด้วยกฎเดียวกับด้านบน
-    result.sort((a, b) {
+    // ✅ กันพลาด: dedupe อีกรอบ
+    final deduped = _uniqByIdKind(result);
+
+    // ✅ เรียงลำดับ (เช็คชื่อที่ยังเปิด > ประกาศปักหมุด > ใหม่สุด)
+    deduped.sort((a, b) {
       final now = DateTime.now();
       final aKind = a.extra['kind']?.toString();
       final bKind = b.extra['kind']?.toString();
@@ -253,18 +261,14 @@ class FeedService {
       final aIsCheckin = a.type == FeedType.checkin || aKind == 'checkin';
       final bIsCheckin = b.type == FeedType.checkin || bKind == 'checkin';
 
-      // เช็คชื่อที่ยังไม่หมดอายุอยู่บนสุด
       if (aIsCheckin || bIsCheckin) {
         final aExpired = a.expiresAt != null && a.expiresAt!.isBefore(now);
         final bExpired = b.expiresAt != null && b.expiresAt!.isBefore(now);
 
-        if (aExpired != bExpired)
-          return aExpired ? 1 : -1; // ยังเปิดอยู่ขึ้นก่อน
-        if (aIsCheckin != bIsCheckin)
-          return aIsCheckin ? -1 : 1; // เช็คชื่อมาก่อน
+        if (aExpired != bExpired) return aExpired ? 1 : -1; // ยังเปิดก่อน
+        if (aIsCheckin != bIsCheckin) return aIsCheckin ? -1 : 1;
       }
 
-      // ประกาศที่ปักหมุดอยู่ถัดมา
       final aIsAnn = aKind == 'announcement';
       final bIsAnn = bKind == 'announcement';
       if (aIsAnn && bIsAnn) {
@@ -273,11 +277,10 @@ class FeedService {
         if (ap != bp) return bp ? 1 : -1; // pinned มาก่อน
       }
 
-      // ที่เหลือเรียงตามเวลาใหม่สุด
       return b.postedAt.compareTo(a.postedAt);
     });
 
-    return result;
+    return deduped;
   }
 
   /// ✅ ฟีดของครู (เช็คชื่อ + งานครู + ประกาศ)
@@ -285,7 +288,6 @@ class FeedService {
     String classId,
   ) async {
     final items = await getClassFeed(classId);
-    // ใช้กฎเรียงเดียวกัน (กันพลาดถ้ามีการเรียกฟังก์ชันนี้ตรง ๆ)
     items.sort((a, b) {
       final aIsAnn = (a.extra['kind']?.toString() == 'announcement');
       final bIsAnn = (b.extra['kind']?.toString() == 'announcement');

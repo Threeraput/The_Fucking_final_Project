@@ -10,6 +10,12 @@ import 'package:frontend/services/attendance_service.dart';
 import 'package:frontend/screens/student_checkin_screen.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/student_report_tab.dart';
+
+// Added for People tab (fetching class members)
+import 'package:frontend/services/class_service.dart';
+import 'package:frontend/models/classroom.dart';
+import 'package:frontend/models/users.dart';
+
 class StudentClassView extends StatefulWidget {
   final String classId; // <- ต้องเป็น UUID ของคลาส
   final String className;
@@ -64,26 +70,28 @@ class _StudentClassViewState extends State<StudentClassView> {
   }
 
   Widget _buildBody() {
-  switch (_currentIndex) {
-    case 0:
-      return _StudentStreamTab(
-        classId: widget.classId,
-        className: widget.className,
-        teacherName: widget.teacherName,
-      );
-    case 1:
-      //  เปลี่ยนจาก const _StudentClassworkTab() -> ส่ง classId และ isTeacher=false
-      return StudentClassworkTab(
-        classId: widget.classId,
-      );
-    case 2:
-      return const StudentReportTab();
-    case 3:
-      return _StudentPeopleTab(teacherName: widget.teacherName);
-    default:
-      return const SizedBox.shrink();
+    switch (_currentIndex) {
+      case 0:
+        return _StudentStreamTab(
+          classId: widget.classId,
+          className: widget.className,
+          teacherName: widget.teacherName,
+        );
+      case 1:
+        // เปลี่ยนจาก const _StudentClassworkTab() -> ส่ง classId และ isTeacher=false
+        return StudentClassworkTab(classId: widget.classId);
+      case 2:
+        return const StudentReportTab();
+      case 3:
+        // People tab now loads real members from API
+        return _StudentPeopleTab(
+          classId: widget.classId,
+          fallbackTeacherName: widget.teacherName,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
-}
 }
 
 /// ======================
@@ -116,7 +124,7 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
 
   Future<void> _refresh() async {
     setState(() {
-        _futureFeed = FeedService.getClassFeedForStudentWithAssignments(
+      _futureFeed = FeedService.getClassFeedForStudentWithAssignments(
         widget.classId,
       );
     });
@@ -148,17 +156,18 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
                   Text(
                     className,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                    'Teacher: $teacherName'),
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                    'Teacher: $teacherName',
+                  ),
                 ],
               ),
             ),
@@ -166,8 +175,7 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
           const SizedBox(height: 12),
 
           // แบนเนอร์เช็คชื่อที่กำลังเปิด (นักเรียน)
-          //ActiveSessionsBanner(classId: classId, isTeacherView: false),
-
+          // ActiveSessionsBanner(classId: classId, isTeacherView: false),
           const SizedBox(height: 16),
           Text('Announcements', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -317,31 +325,124 @@ class _StudentReportTab extends StatelessWidget {
 /// ======================
 /// 🔹 PEOPLE TAB
 /// ======================
-class _StudentPeopleTab extends StatelessWidget {
-  final String teacherName;
-  const _StudentPeopleTab({required this.teacherName});
+class _StudentPeopleTab extends StatefulWidget {
+  final String classId;
+  final String fallbackTeacherName;
+  const _StudentPeopleTab({
+    required this.classId,
+    required this.fallbackTeacherName,
+  });
+
+  @override
+  State<_StudentPeopleTab> createState() => _StudentPeopleTabState();
+}
+
+class _StudentPeopleTabState extends State<_StudentPeopleTab> {
+  bool _loading = true;
+  bool _error = false;
+  String _errorMsg = '';
+  Classroom? _classroom;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClassroom();
+  }
+
+  Future<void> _loadClassroom() async {
+    setState(() {
+      _loading = true;
+      _error = false;
+      _errorMsg = '';
+    });
+    try {
+      final cls = await ClassService.getClassroomMembers(widget.classId);
+      setState(() {
+        _classroom = cls;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = true;
+        _errorMsg = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  String _displayUserName(User u) => u.displayName;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text('Teacher', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person)),
-          title: Text(teacherName),
-        ),
-        const SizedBox(height: 12),
-        Text('Students', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        const Card(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('จะแสดงรายชื่อเพื่อนร่วมชั้นเมื่อ API พร้อม'),
+    if (_loading) return const Center(child: CircularProgressIndicator());
+
+    if (_error) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                'โหลดรายชื่อสมาชิกไม่สำเร็จ\n$_errorMsg',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: _loadClassroom,
+                icon: const Icon(Icons.refresh),
+                label: const Text('ลองใหม่'),
+              ),
+            ],
           ),
         ),
-      ],
+      );
+    }
+
+    final cls = _classroom;
+    final students = cls?.students ?? const <User>[];
+
+    return RefreshIndicator(
+      onRefresh: _loadClassroom,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('Teacher', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const CircleAvatar(child: Icon(Icons.person)),
+            title: Text(
+              cls?.teacher != null
+                  ? _displayUserName(cls!.teacher!)
+                  : widget.fallbackTeacherName,
+            ),
+            subtitle: Text(cls?.teacher?.email ?? ''),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Students (${students.length})',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (students.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('ยังไม่มีนักเรียน'),
+              ),
+            )
+          else
+            ...students.map(
+              (s) => ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(_displayUserName(s)),
+                subtitle: Text(s.email ?? ''),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
