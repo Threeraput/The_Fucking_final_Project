@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:frontend/services/announcement_service.dart';
 
 class CreateAnnouncementScreen extends StatefulWidget {
   final String classId;
@@ -21,6 +23,11 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
   bool _posting = false;
   bool _success = false;
 
+  // เพิ่มตัวเลือกเสริม
+  bool _pinned = false;
+  bool _visible = true;
+  DateTime? _expiresAt;
+
   @override
   void dispose() {
     _titleCtl.dispose();
@@ -28,9 +35,33 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
     super.dispose();
   }
 
+  Future<void> _pickExpireDateTime() async {
+    final now = DateTime.now();
+    final init = _expiresAt ?? now.add(const Duration(days: 7));
+
+    final d = await showDatePicker(
+      context: context,
+      initialDate: init,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365 * 3)),
+    );
+    if (d == null) return;
+
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(init),
+    );
+    if (t == null) return;
+
+    setState(() {
+      _expiresAt = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+    });
+  }
+
   Future<void> _post() async {
     final title = _titleCtl.text.trim();
     final body = _bodyCtl.text.trim();
+
     if (title.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -40,12 +71,18 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
 
     setState(() => _posting = true);
     try {
-      // TODO: เรียก Service จริง เช่น AnnouncementService.create(...)
-      await Future.delayed(const Duration(milliseconds: 500));
+      await AnnouncementService.create(
+        classId: widget.classId,
+        title: title,
+        body: body.isEmpty ? null : body,
+        pinned: _pinned,
+        visible: _visible,
+        expiresAt:
+            _expiresAt, // ส่งเป็น DateTime? (ให้ service แปลงเป็น ISO8601)
+      );
+
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('สร้างประกาศสำเร็จ')));
+      // ให้หน้าก่อนหน้ารู้ว่าทำสำเร็จแล้วไป refresh เอง
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -67,6 +104,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final df = DateFormat('dd MMM yyyy HH:mm');
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -147,6 +185,47 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  
+                   // แถวตัวเลือก
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  value: _pinned,
+                  onChanged: (v) => setState(() => _pinned = v ?? false),
+                  title: const Text('ปักหมุด (Pinned)'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SwitchListTile(
+                  value: _visible,
+                  onChanged: (v) => setState(() => _visible = v),
+                  title: const Text('แสดงให้นักเรียนเห็น'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+
+          // วันหมดอายุ (ไม่บังคับ)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('วันหมดอายุ (ไม่บังคับ)'),
+            subtitle: Text(
+              _expiresAt == null
+                  ? '— ไม่ตั้งหมดอายุ —'
+                  : df.format(_expiresAt!.toLocal()),
+            ),
+            trailing: OutlinedButton.icon(
+              icon: const Icon(Icons.event),
+              label: const Text('ตั้งวัน/เวลา'),
+              onPressed: _pickExpireDateTime,
+            ),
+          ),
+          const SizedBox(height: 16),
 
                   // 🔹 ปุ่มโพสต์
                   FilledButton.icon(

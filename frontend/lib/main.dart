@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:frontend/screens/assignment_detail_screen.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_assignment_screen.dart';
+import 'package:frontend/screens/edit_announcement_screen.dart';
 import 'package:frontend/screens/verify_face_route.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -154,6 +155,15 @@ class MyApp extends StatelessWidget {
             assignmentId: args['assignmentId'],
             title: args['title'] ?? 'Assignment',
             classId: args['classId'],
+          );
+        },
+        '/edit-announcement': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map;
+          final ann = args['announcement'];
+          return EditAnnouncementScreen(
+            announcementId: ann['announcement_id'],
+            title: ann['title'],
+            body: ann['body'],
           );
         },
       },

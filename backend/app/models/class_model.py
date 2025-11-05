@@ -30,6 +30,7 @@ class Class(Base):
     student_location_logs = relationship("StudentLocation", back_populates="classroom", cascade="all, delete-orphan")
     # เพิ่ม Relationship สำหรับ Classwork
     assignments = relationship("ClassworkAssignment", back_populates="classroom", cascade="all, delete-orphan")
+    announcements = relationship("Announcement", back_populates="klass", cascade="all, delete-orphan")
     def __repr__(self):
         return f"<Class(name='{self.name}')>"
 

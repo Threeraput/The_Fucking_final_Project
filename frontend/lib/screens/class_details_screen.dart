@@ -63,71 +63,25 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
     }
   }
 
-  void _openCreateAnnouncement() async {
-    final ok = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CreateAnnouncementScreen(
-          classId: widget.classId,
-          className: _classroom?.name ?? widget.className ?? 'Class',
-        ),
+  Future<void> _openCreateAnnouncement() async {
+  final ok = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CreateAnnouncementScreen(
+        classId: widget.classId,
+        className: _classroom?.name ?? widget.className ?? 'Class',
       ),
-    );
+    ),
+  );
 
-    if (ok == true && _isTeacher && mounted) {
-      final wantOpen = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('เปิดเช็คชื่อต่อเลยไหม?'),
-          content: RichText(
-            text: TextSpan(
-              style: TextStyle(color: Colors.black, fontSize: 16),
-              children: [
-                TextSpan(text: 'คุณเพิ่งประกาศแล้ว '),
-                TextSpan(
-                  text: 'ต้องการเปิด session เช็คชื่อ',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                TextSpan(text: ' สำหรับคลาสนี้ตอนนี้เลยหรือไม่'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text(
-                style: TextStyle(color: Colors.grey),
-                'ภายหลัง',
-              ),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.blueAccent, // สีพื้นหลัง
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('เปิดเลย'),
-            ),
-          ],
-        ),
-      );
-      if (wantOpen == true) {
-        final opened = await showModalBottomSheet<bool>(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => TeacherOpenCheckinSheet(classId: widget.classId),
-        );
-        if (opened == true && mounted) {
-          _streamKey.currentState?.refreshFeed();
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('เปิดเช็คชื่อแล้ว')));
-        }
-      }
-    }
+  // ✅ ถ้าโพสต์สำเร็จ แค่รีเฟรชฟีดพอ ไม่ต้องถามเปิดเช็คชื่อ
+  if (ok == true && mounted) {
+    _streamKey.currentState?.refreshFeed();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('สร้างประกาศสำเร็จ')),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
