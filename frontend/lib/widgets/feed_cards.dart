@@ -196,7 +196,9 @@ class _FeedCard extends StatelessWidget {
         if (snap.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: CircularProgressIndicator(
+              color: Colors.blue,
+            )),
           );
         }
 
@@ -349,9 +351,9 @@ class _FeedCard extends StatelessWidget {
                           newEnabled
                               ? 'เปิด reverify แล้ว'
                               : 'ปิด reverify แล้ว',
-                          style: const TextStyle(color: Colors.black),
+                          
                         ),
-                        behavior: SnackBarBehavior.floating,
+                        // behavior: SnackBarBehavior.floating,
                       ),
                     );
                   }

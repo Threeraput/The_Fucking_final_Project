@@ -78,7 +78,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   if (ok == true && mounted) {
     _streamKey.currentState?.refreshFeed();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('สร้างประกาศสำเร็จ')),
+      const SnackBar(content: Text('สร้างประกาศสำเร็จ'),
+      ),
     );
   }
 }

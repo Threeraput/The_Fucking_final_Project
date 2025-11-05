@@ -56,7 +56,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('Admin Dashboard')),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(
+              color: Colors.blue,
+          ))
           : _errorMessage != null
               ? Center(child: Text(_errorMessage!))
               : _pendingTeachers.isEmpty

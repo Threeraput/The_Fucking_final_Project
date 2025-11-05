@@ -365,7 +365,9 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                           SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              color: Colors.blue,
+                              strokeWidth: 2),
                           ),
                           SizedBox(width: 8),
                           Text(

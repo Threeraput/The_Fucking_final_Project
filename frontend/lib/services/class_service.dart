@@ -170,6 +170,8 @@ class ClassService {
       }
     }
   }
+
+  static Future<void> deleteAllClassrooms() async {}
 }
 
 

@@ -179,7 +179,9 @@ class _StudentStreamTabState extends State<_StudentStreamTab> {
               if (snap.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: CircularProgressIndicator(
+                    color: Colors.blue,
+                  )),
                 );
               }
               if (snap.hasError) {
@@ -254,7 +256,9 @@ class _StudentClassworkTabState extends State<StudentClassworkTab> {
               if (snap.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: CircularProgressIndicator(
+                    color: Colors.blue,
+                  )),
                 );
               }
               if (snap.hasError) {

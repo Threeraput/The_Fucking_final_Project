@@ -352,12 +352,16 @@ Future<void> _captureAndProcess() async {
         foregroundColor: Colors.white, // ✅ เปลี่ยนสีไอคอนเป็นดำ
       ),
       body: controller == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(
+            color: Colors.blue,
+          ))
           : FutureBuilder<void>(
               future: _initializeControllerFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(
+                    color: Colors.blue,
+                  ));
                 }
 
                 if (!_consentGiven && !widget.isVerificationMode) {

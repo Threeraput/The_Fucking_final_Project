@@ -56,6 +56,7 @@ class MyApp extends StatelessWidget {
       case '/home':
         return MaterialPageRoute(builder: (_) => HomeScreen());
       case '/verify-otp':
+        
         {
           final email = settings.arguments as String?;
           return MaterialPageRoute(

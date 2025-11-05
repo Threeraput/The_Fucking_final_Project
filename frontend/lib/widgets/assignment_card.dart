@@ -229,7 +229,9 @@ class _StudentSubmitButtonState extends State<_StudentSubmitButton> {
       return const SizedBox(
         height: 40,
         width: 140,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: CircularProgressIndicator(
+          color: Colors.blue,
+        )),
       );
     }
 

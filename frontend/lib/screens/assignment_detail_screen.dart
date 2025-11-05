@@ -157,7 +157,9 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
           future: _future,
           builder: (context, snap) {
             if (snap.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: CircularProgressIndicator(
+                color: Colors.blue,
+              ));
             }
             if (snap.hasError) {
               return Center(child: Text('โหลดข้อมูลไม่สำเร็จ: ${snap.error}'));

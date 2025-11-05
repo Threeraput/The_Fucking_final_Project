@@ -93,7 +93,9 @@ class _StudentReverifyScreenState extends State<StudentReverifyScreen> {
         future: _init,
         builder: (_, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(
+              color: Colors.blue,
+            ));
           }
           if (snap.hasError) {
             return Center(child: Text(snap.error.toString()));
