@@ -92,7 +92,9 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
 
     // ถ้ายังโหลดข้อมูล user ไม่เสร็จ — ไม่แสดง Drawer
     if (me == null) {
-      return const Drawer(child: Center(child: CircularProgressIndicator()));
+      return const Drawer(child: Center(child: CircularProgressIndicator(
+        color: Color.fromARGB(255, 28, 178, 248),
+      )));
     }
 
     // เช็คว่าเป็น student หรือไม่
@@ -461,7 +463,9 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         child: const Icon(Icons.add, color: Colors.white),
       ),
       body: me == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 28, 178, 248),
+          ))
           : (_isTeacher
                 ? _TeacherClasses(
                     futureTaught: _futureTaught,
@@ -486,7 +490,9 @@ class _TeacherClasses extends StatelessWidget {
       future: futureTaught,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 28, 178, 248),
+          ));
         }
         if (snap.hasError) {
           return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
@@ -523,7 +529,9 @@ class _StudentClasses extends StatelessWidget {
       future: futureJoined,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 28, 178, 248),
+          ));
         }
         if (snap.hasError) {
           return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));

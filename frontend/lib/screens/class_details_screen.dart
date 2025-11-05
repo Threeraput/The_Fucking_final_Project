@@ -89,7 +89,10 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 28, 178, 248),
+            
+          ))
           : _error
           ? const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'))
           : _buildBody(),
@@ -334,7 +337,9 @@ class _StreamTabState extends State<_StreamTab> {
               if (snap.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: CircularProgressIndicator(
+                    color: Color.fromARGB(255, 28, 178, 248),
+                  )),
                 );
               }
               if (snap.hasError) {
@@ -397,7 +402,9 @@ void initState() {
         future: _futureAssignments,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(
+               color: Color.fromARGB(255, 28, 178, 248),
+            ));
           }
           if (snap.hasError) {
             return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
