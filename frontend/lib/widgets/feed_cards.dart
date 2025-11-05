@@ -259,44 +259,51 @@ class _FeedCard extends StatelessWidget {
     required bool hasCheckedIn,
     required bool canReverify,
   }) {
-    if (isTeacher) {
-      // ปุ่มสำหรับครู: toggle reverify
-      return OutlinedButton(
-        onPressed: (sessionId != null)
-            ? () async {
-                try {
-                  final next = !(item.extra['reverify_enabled'] == true);
-                  final enabled = await SessionsService.toggleReverify(
-                    sessionId: sessionId!,
-                    enabled: next,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          enabled ? 'เปิด reverify แล้ว' : 'ปิด reverify แล้ว',
-                        ),
-                      ),
-                    );
-                  }
-                  onChanged?.call();
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('สลับ reverify ไม่สำเร็จ: $e')),
-                    );
-                  }
-                }
+   if (isTeacher) {
+  // ปุ่มสำหรับครู: toggle reverify
+  final isEnabled = item.extra['reverify_enabled'] == true;
+
+  return OutlinedButton(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: Colors.white, // สีข้อความบนปุ่ม
+      backgroundColor: isEnabled ? Colors.red : Colors.green, // 🔁 สลับสี
+      side: BorderSide(color: isEnabled ? Colors.red : Colors.green), // เส้นขอบ
+    ),
+    onPressed: (sessionId != null)
+        ? () async {
+            try {
+              final next = !isEnabled;
+              final enabled = await SessionsService.toggleReverify(
+                sessionId: sessionId!,
+                enabled: next,
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      enabled ? 'เปิด reverify แล้ว' : 'ปิด reverify แล้ว',
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
-            : null,
-        child: Text(
-          item.extra['reverify_enabled'] == true
-              ? 'ปิด reverify'
-              : 'เปิด reverify',
-              style: TextStyle(color: Colors.black),
-        ),
-      );
-    }
+              onChanged?.call();
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('สลับ reverify ไม่สำเร็จ: $e'),
+                  ),
+                );
+              }
+            }
+          }
+        : null,
+    child: Text(isEnabled ? 'ปิด reverify' : 'เปิด reverify'),
+  );
+}
+
 
     // นักเรียน
     if (sessionId == null) return const SizedBox.shrink();
@@ -368,8 +375,11 @@ class _FeedCard extends StatelessWidget {
                     }
                   }
                 : null,
-            icon: const Icon(Icons.verified_user_outlined),
-            label: Text(isReverified ? 'ยืนยันแล้ว' : 'ยืนยันซ้ำ'),
+            label: Text(
+              style: TextStyle(
+                color: Colors.black
+              ),
+              isReverified ? 'ยืนยันแล้ว' : 'ยืนยันซ้ำ'),
           );
         },
       ),

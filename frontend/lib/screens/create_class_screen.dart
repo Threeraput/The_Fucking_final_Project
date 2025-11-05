@@ -204,7 +204,10 @@ Widget build(BuildContext context) {
                             _startAt == null
                                 ? 'วันเริ่ม'
                                 : _startAt!.toIso8601String().split('T').first,
-                            style: const TextStyle(color: Colors.black),
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 13,
+                              ),
                           ),
                           onPressed: () => _pickDate(true),
                         ),
@@ -217,7 +220,10 @@ Widget build(BuildContext context) {
                             _endAt == null
                                 ? 'วันสิ้นสุด'
                                 : _endAt!.toIso8601String().split('T').first,
-                            style: const TextStyle(color: Colors.black),
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 13,
+                              ),
                           ),
                           onPressed: () => _pickDate(false),
                         ),

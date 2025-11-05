@@ -141,8 +141,15 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           : _buildBody(),
       floatingActionButton: _currentIndex == 1 && _isTeacher
           ? FloatingActionButton.extended(
-              icon: const Icon(Icons.add),
-              label: const Text('เพิ่มงาน'),
+            backgroundColor: Colors.blueAccent,
+              icon: const Icon(
+                color: Colors.white,
+                Icons.add),
+              label: const Text(
+                style: TextStyle(
+                  color: Colors.white
+                ),
+                'เพิ่มงาน'),
               onPressed: () async {
                 final ok = await Navigator.pushNamed(
                   context,

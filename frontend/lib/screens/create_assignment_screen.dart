@@ -226,7 +226,9 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
                     icon: Icon(color: Colors.white, Icons.save_outlined),
                     label: Text(
                       _submitting ? 'กำลังบันทึก...' : 'บันทึกงาน',
-                      style: const TextStyle(fontSize: 16),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,

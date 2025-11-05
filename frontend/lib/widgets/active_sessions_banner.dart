@@ -172,6 +172,14 @@ class _SessionRow extends StatelessWidget {
                 children: [
                   OutlinedButton(
                     // ✅ เอา notExpired ออก ถ้าอยากให้กดได้ตลอด (เหลือแค่เช็คว่ามี sessionId)
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: reverifyEnabled ? Colors.green : Colors.red, // สีพื้นตามสถานะ
+                    foregroundColor: Colors.white, // สีตัวอักษร
+                    side: BorderSide(
+                    color: reverifyEnabled ? Colors.green : Colors.red, // สีขอบ
+                    width: 1.5,
+                      ),
+                    ),
                     onPressed: (sessionId != null)
                         ? () async {
                             try {
@@ -211,7 +219,7 @@ class _SessionRow extends StatelessWidget {
                         : null, // ไม่มี sessionId -> ปิดปุ่ม
                     child: Text(
                       reverifyEnabled ? 'ปิด reverify' : 'เปิด reverify',
-                      style: TextStyle(color: Colors.black),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
