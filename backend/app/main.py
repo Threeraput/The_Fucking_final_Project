@@ -42,7 +42,8 @@ origins = [
     "http://127.0.0.1",
     "http://127.0.0.1:5000", # ถ้า Flutter Web รันที่พอร์ตเดียวกันกับ Backend
     "http://127.0.0.1:5500", # พอร์ตที่ VS Code Live Server หรือ Flutter Web อาจใช้
-    "http://192.168.1.141:5000", # IP Address ของเครื่องที่รัน Backend
+    "http://10.32.189.77:5000", # IP Address ของเครื่องที่รัน Backend
+    
     "file://", 
     "null", 
     # เพิ่ม IP Address ของเครื่องที่คุณรัน Flutter App หากทดสอบบนมือถือจริงในเครือข่ายเดียวกัน

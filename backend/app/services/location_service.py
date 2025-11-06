@@ -10,7 +10,7 @@ from app.models.teacher_location import TeacherLocation
 from app.models.student_location import StudentLocation
 
 # ระยะที่ยอมให้ห่างจากครู (เมตร)
-PROXIMITY_THRESHOLD: float = 20.0
+PROXIMITY_THRESHOLD: float = 10.0
 
 
 # -----------------------------

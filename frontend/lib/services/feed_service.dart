@@ -7,7 +7,7 @@ import 'package:frontend/models/classwork.dart';
 import '../models/feed_item.dart';
 import 'attendance_service.dart';
 
-// ✅ เพิ่มบริการประกาศ
+//  เพิ่มบริการประกาศ
 import 'package:frontend/services/announcement_service.dart';
 
 /// Helper เล็กๆ: แปลงค่าจาก backend เป็น boolean
