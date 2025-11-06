@@ -1,13 +1,12 @@
-// File: lib/services/class_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/classroom.dart';
-import 'auth_service.dart' show AuthService; // ใช้เฉพาะ getAccessToken()
+import 'auth_service.dart' show AuthService; // ใช้ getAccessToken()
 
-//  ตั้ง BASE_URL ไว้ในไฟล์นี้ ไม่ต้อง import จาก auth_service.dart
-const String API_BASE_URL = 'http://192.168.0.197:8000/api/v1';
+const String API_BASE_URL = 'http://192.168.0.200:8000/api/v1';
+
 class ClassService {
-  // ===== Headers + Error Handler =====
+  // ===== Headers =====
   static Future<Map<String, String>> _headers() async {
     final token = await AuthService.getAccessToken();
     return {
@@ -17,6 +16,7 @@ class ClassService {
     };
   }
 
+  // ===== Utilities =====
   static Exception _errorFrom(http.Response res) {
     try {
       final m = json.decode(res.body);
@@ -56,34 +56,21 @@ class ClassService {
     throw _errorFrom(res);
   }
 
-  /// 3) POST /classes/join (นักเรียนเข้าร่วมด้วย code)
+  /// 3) POST /classes/join (นักเรียนเข้าร่วม)
   static Future<void> joinClassroom(String code) async {
-    final token = await AuthService.getAccessToken();
     final url = Uri.parse('$API_BASE_URL/classes/join');
-
     final res = await http.post(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+      headers: await _headers(),
       body: json.encode({'code': code}),
     );
-
-    if (res.statusCode == 200) {
-      return; // สำเร็จ ไม่ต้องทำอะไรเพิ่ม
-    }
-
-    // ถ้าเกิด error จาก backend
-    String message = 'เข้าร่วมคลาสไม่สำเร็จ';
+    if (res.statusCode == 200) return;
     try {
       final data = json.decode(res.body);
-      if (data['detail'] != null) {
-        message = data['detail'];
-      }
-    } catch (_) {}
-
-    throw Exception(message);
+      throw Exception(data['detail'] ?? 'เข้าร่วมคลาสไม่สำเร็จ');
+    } catch (_) {
+      throw Exception('เข้าร่วมคลาสไม่สำเร็จ');
+    }
   }
 
   /// 4) DELETE /classes/{class_id}/students/{student_id}
@@ -94,7 +81,7 @@ class ClassService {
     throw _errorFrom(res);
   }
 
-  /// 5) PATCH /classes/{class_id} (อัปเดตรายละเอียดห้อง)
+  /// 5) PATCH /classes/{class_id}
   static Future<Classroom> updateClassroom(
     String classId,
     ClassroomUpdate data,
@@ -111,7 +98,7 @@ class ClassService {
     throw _errorFrom(res);
   }
 
-  /// 6) DELETE /classes/{class_id} (ลบห้อง)
+  /// 6) DELETE /classes/{class_id}
   static Future<void> deleteClassroom(String classId) async {
     final url = Uri.parse('$API_BASE_URL/classes/$classId');
     final res = await http.delete(url, headers: await _headers());
@@ -119,7 +106,7 @@ class ClassService {
     throw _errorFrom(res);
   }
 
-  /// 7) GET /classes/{class_id} (รายละเอียดห้อง)
+  /// 7) GET /classes/{class_id}
   static Future<Classroom> getClassroomDetails(String classId) async {
     final url = Uri.parse('$API_BASE_URL/classes/$classId');
     final res = await http.get(url, headers: await _headers());
@@ -128,7 +115,8 @@ class ClassService {
     }
     throw _errorFrom(res);
   }
-/// NEW: GET /classes/enrolled - รายการคลาสที่นักเรียนเข้าร่วม
+
+  /// 8) GET /classes/enrolled
   static Future<List<Classroom>> getJoinedClasses() async {
     final url = Uri.parse('$API_BASE_URL/classes/enrolled');
     final res = await http.get(url, headers: await _headers());
@@ -140,15 +128,14 @@ class ClassService {
     }
     throw _errorFrom(res);
   }
-  // 🔹 นักเรียนออกจากคลาส static Future<void> leaveClassroom(String classId) async {
-   static Future<void> leaveClassroom(String classId) async {
+
+  /// 9) นักเรียนออกจากคลาส
+  static Future<void> leaveClassroom(String classId) async {
     final token = await AuthService.getAccessToken();
     final user = await AuthService.getCurrentUserFromLocal();
     if (user == null) throw Exception('ไม่พบข้อมูลผู้ใช้ในระบบ');
-
-    final studentId = user.userId; // ได้จาก token ที่ login ไว้
+    final studentId = user.userId;
     final url = Uri.parse('$API_BASE_URL/classes/$classId/students/$studentId');
-
     final res = await http.delete(
       url,
       headers: {
@@ -156,22 +143,25 @@ class ClassService {
         'Content-Type': 'application/json',
       },
     );
-
-    if (res.statusCode == 204) {
-      // success
-      return;
-    } else {
-      try {
-        final data = json.decode(res.body);
-        final detail = data['detail'] ?? 'ไม่สามารถออกจากคลาสได้';
-        throw Exception(detail);
-      } catch (_) {
-        throw Exception('ออกจากคลาสไม่สำเร็จ (status: ${res.statusCode})');
-      }
+    if (res.statusCode == 204) return;
+    try {
+      final data = json.decode(res.body);
+      throw Exception(data['detail'] ?? 'ออกจากคลาสไม่สำเร็จ');
+    } catch (_) {
+      throw Exception('ออกจากคลาสไม่สำเร็จ (status: ${res.statusCode})');
     }
   }
 
-  static Future<void> deleteAllClassrooms() async {}
+  /// 10) GET /classes/{class_id}/members : ใช้ดึงรายชื่อครู + เพื่อนในคลาส
+  static Future<Classroom> getClassroomMembers(String classId) async {
+    final url = Uri.parse('$API_BASE_URL/classes/$classId/members');
+    final res = await http.get(url, headers: await _headers());
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body) as Map<String, dynamic>;
+      return Classroom.fromJson(data);
+    }
+    if (res.statusCode == 403) throw Exception('Forbidden');
+    if (res.statusCode == 404) throw Exception('Class not found');
+    throw Exception('HTTP ${res.statusCode}: ${res.body}');
+  }
 }
-
-

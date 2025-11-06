@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
+import 'package:frontend/screens/class_report_tab.dart';
 import 'package:frontend/screens/classroom_home_screen.dart';
 import 'package:frontend/screens/create_announcement_screen.dart';
 import 'package:frontend/screens/teacher_open_checkin_sheet.dart';
@@ -10,6 +11,9 @@ import 'package:frontend/services/feed_service.dart';
 import 'package:frontend/widgets/feed_cards.dart';
 import 'package:frontend/models/feed_item.dart';
 import 'package:intl/intl.dart';
+
+// ✅ ใช้สำหรับ URL รูปโปรไฟล์
+import 'package:frontend/services/user_service.dart';
 
 class ClassDetailsScreen extends StatefulWidget {
   final String classId;
@@ -46,6 +50,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
 
       Classroom? cls;
       if (isTeacher) {
+        // ครูใช้รายละเอียดคลาส (ควรรวม teacher + students พร้อม avatar_url)
         cls = await ClassService.getClassroomDetails(widget.classId);
       }
 
@@ -64,25 +69,24 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
   }
 
   Future<void> _openCreateAnnouncement() async {
-  final ok = await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => CreateAnnouncementScreen(
-        classId: widget.classId,
-        className: _classroom?.name ?? widget.className ?? 'Class',
-      ),
-    ),
-  );
-
-  // ✅ ถ้าโพสต์สำเร็จ แค่รีเฟรชฟีดพอ ไม่ต้องถามเปิดเช็คชื่อ
-  if (ok == true && mounted) {
-    _streamKey.currentState?.refreshFeed();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('สร้างประกาศสำเร็จ'),
+    final ok = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateAnnouncementScreen(
+          classId: widget.classId,
+          className: _classroom?.name ?? widget.className ?? 'Class',
+        ),
       ),
     );
+
+    //  ถ้าโพสต์สำเร็จ แค่รีเฟรชฟีดพอ
+    if (ok == true && mounted) {
+      _streamKey.currentState?.refreshFeed();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('สร้างประกาศสำเร็จ')));
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -90,24 +94,22 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(
-            color: Color.fromARGB(255, 28, 178, 248),
-            
-          ))
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 28, 178, 248),
+              ),
+            )
           : _error
           ? const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'))
           : _buildBody(),
       floatingActionButton: _currentIndex == 1 && _isTeacher
           ? FloatingActionButton.extended(
-            backgroundColor: Colors.blueAccent,
-              icon: const Icon(
-                color: Colors.white,
-                Icons.add),
+              backgroundColor: Colors.blueAccent,
+              icon: const Icon(color: Colors.white, Icons.add),
               label: const Text(
-                style: TextStyle(
-                  color: Colors.white
-                ),
-                'เพิ่มงาน'),
+                style: TextStyle(color: Colors.white),
+                'เพิ่มงาน',
+              ),
               onPressed: () async {
                 final ok = await Navigator.pushNamed(
                   context,
@@ -118,6 +120,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
               },
             )
           : null,
+
+      //  Bottom Navigation Bar เหมือนเดิม
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         selectedItemColor: Colors.blueAccent,
@@ -136,7 +140,7 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_outlined),
-            label: 'Report',
+            label: 'Report', // ✅ หน้ารายงานใหม่
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people_outline),
@@ -160,7 +164,8 @@ class _ClassDetailsScreenState extends State<ClassDetailsScreen> {
       case 1:
         return _ClassworkTab(classId: widget.classId, isTeacher: _isTeacher);
       case 2:
-        return const _ReportTab();
+        //  แท็บรายงานจริง
+        return ClassReportTab(classId: widget.classId);
       case 3:
         return _PeopleTab(classroom: _classroom);
       default:
@@ -203,12 +208,10 @@ class _StreamTabState extends State<_StreamTab> {
 
   Future<void> _refresh({bool force = false}) async {
     setState(() {
-      _futureFeed = FeedService.getClassFeed(widget.classId, ).then(
-        (list) {
-          _lastFeed = list;
-          return list;
-        },
-      );
+      _futureFeed = FeedService.getClassFeed(widget.classId).then((list) {
+        _lastFeed = list;
+        return list;
+      });
     });
   }
 
@@ -342,9 +345,11 @@ class _StreamTabState extends State<_StreamTab> {
               if (snap.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator(
-                    color: Color.fromARGB(255, 28, 178, 248),
-                  )),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Color.fromARGB(255, 28, 178, 248),
+                    ),
+                  ),
                 );
               }
               if (snap.hasError) {
@@ -384,7 +389,7 @@ class _ClassworkTabState extends State<_ClassworkTab> {
   late Future<List<FeedItem>> _futureAssignments;
 
   @override
-void initState() {
+  void initState() {
     super.initState();
     _futureAssignments = widget.isTeacher
         ? FeedService.getClassFeedForTeacherWithAssignments(widget.classId)
@@ -407,9 +412,11 @@ void initState() {
         future: _futureAssignments,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return Center(child: CircularProgressIndicator(
-               color: Color.fromARGB(255, 28, 178, 248),
-            ));
+            return Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 28, 178, 248),
+              ),
+            );
           }
           if (snap.hasError) {
             return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
@@ -460,10 +467,29 @@ class _ReportTab extends StatelessWidget {
   }
 }
 
-/// 🔹 PEOPLE TAB
+/// 🔹 PEOPLE TAB (Teacher)
 class _PeopleTab extends StatelessWidget {
   final Classroom? classroom;
   const _PeopleTab({required this.classroom});
+
+  CircleAvatar _avatarFor(User u, {double radius = 20}) {
+    final url = UserService.absoluteAvatarUrl(u.avatarUrl);
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(radius: radius, backgroundImage: NetworkImage(url));
+    }
+    final initial =
+        (u.username.isNotEmpty
+                ? u.username[0]
+                : (u.email?.isNotEmpty == true ? u.email![0] : '?'))
+            .toUpperCase();
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade300,
+      child: Text(initial, style: const TextStyle(color: Colors.black87)),
+    );
+  }
+
+  String _display(User u) => u.displayName;
 
   @override
   Widget build(BuildContext context) {
@@ -477,8 +503,10 @@ class _PeopleTab extends StatelessWidget {
         Text('Teacher', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person)),
-          title: Text(c.teacher?.username ?? c.teacher?.email ?? '-'),
+          leading: c.teacher != null
+              ? _avatarFor(c.teacher!, radius: 22)
+              : const CircleAvatar(child: Icon(Icons.person)),
+          title: Text(c.teacher != null ? _display(c.teacher!) : '-'),
           subtitle: Text(c.teacher?.email ?? ''),
         ),
         const SizedBox(height: 12),
@@ -496,8 +524,8 @@ class _PeopleTab extends StatelessWidget {
           ),
         ...c.students.map(
           (s) => ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-            title: Text(s.username ?? s.email ?? '-'),
+            leading: _avatarFor(s),
+            title: Text(_display(s)),
             subtitle: Text(s.email ?? ''),
           ),
         ),

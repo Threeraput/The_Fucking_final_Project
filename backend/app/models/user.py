@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from app.database import Base
 from app.models.association import user_roles, class_students # ตรวจสอบว่า import class_students ด้วย
 from app.models.attendance_session import AttendanceSession
+from pydantic import BaseModel
+from typing import Optional
 
 class User(Base):
     __tablename__ = "users"
@@ -24,7 +26,7 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login_at = Column(DateTime, nullable=True)
-
+    avatar_url = Column(String(255), nullable=True)
     # Relationships
     # User -> Roles (Many-to-Many)
     roles = relationship("Role", secondary=user_roles, back_populates="users")
@@ -65,3 +67,4 @@ class User(Base):
    
     def __repr__(self):
         return f"<User(username='{self.username}', email='{self.email}')>"
+    

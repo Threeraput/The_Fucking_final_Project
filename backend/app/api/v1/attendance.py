@@ -1,5 +1,6 @@
 # backend/app/api/v1/attendance.py
 import uuid
+from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response, Path, Body, Query
 from sqlalchemy.orm import Session, joinedload
@@ -20,7 +21,7 @@ from app.schemas.attendance_schema import (
 from app.schemas.session_schema import SessionResponse
 from app.schemas.reverify_schema import ToggleReverifyRequest, ToggleReverifyResponse
 # ใช้อันเดียวให้ตรงทั้งโปรเจกต์
-from app.core.deps import get_current_user  # <- ถ้าคุณใช้ของ core.deps อยู่ที่อื่น
+from app.core.deps import get_current_user, role_required  # <- ถ้าคุณใช้ของ core.deps อยู่ที่อื่น
 from app.services.attendance_service import record_check_in , handle_reverification , manual_override_attendance
 from app.services.location_service import update_teacher_location_log, log_student_location
 from datetime import datetime, timezone
@@ -292,3 +293,10 @@ def get_is_reverified(
         raise HTTPException(status_code=404, detail="Attendance record not found")
 
     return {"session_id": str(session_id), "is_reverified": record.is_reverified}
+
+@router.post("/session/{session_id}/finalize",
+             dependencies=[Depends(role_required(["teacher"]))])
+def finalize_session(session_id: UUID, db: Session = Depends(get_db)):
+    from app.services.session_finalizer_service import handle_finalize_session
+    handle_finalize_session(db, session_id)
+    return {"detail": "Session finalized successfully"}
