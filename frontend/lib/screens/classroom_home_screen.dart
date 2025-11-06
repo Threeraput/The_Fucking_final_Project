@@ -12,6 +12,7 @@ import '../screens/camera_screen.dart';
 import '../services/face_service.dart';
 import 'package:frontend/screens/profile_screen.dart';
 import 'package:frontend/services/user_service.dart';
+import 'package:frontend/screens/admin_dashboard_screen.dart';
 
 class ClassroomHomeScreen extends StatefulWidget {
   const ClassroomHomeScreen({super.key});
@@ -28,6 +29,9 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   bool get _isTeacher =>
       _me?.roles.contains('teacher') == true ||
       _me?.roles.contains('admin') == true;
+
+        bool get _isAdmin =>
+      _me?.roles.any((r) => r.toLowerCase() == 'admin') == true;
 
   @override
   void initState() {
@@ -112,6 +116,19 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
     }
   }
 
+
+   Future<void> _openAdmin() async {
+    if (!_isAdmin) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('เฉพาะผู้ดูแลระบบเท่านั้น')));
+      return;
+    }
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+  }
+
   Drawer _buildDrawer() {
     final me = _me;
 
@@ -178,16 +195,38 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                     title: Text(_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน'),
                     onTap: () => Navigator.pop(context),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.calendar_today),
-                    title: const Text('ปฏิทิน'),
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.check_circle_outline),
-                    title: const Text('สิ่งที่ต้องทำ'),
-                    onTap: () {},
-                  ),
+
+                  const Divider(),
+
+                   if (_isAdmin) ...[
+                    const Divider(),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        'ADMIN',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.admin_panel_settings,
+                        color: Colors.deepOrange,
+                      ),
+                      title: const Text('Admin Dashboard'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _openAdmin();
+                      },
+                    ),
+                  ],
+
                   const Divider(),
 
                   // 🔹 เมนูเฉพาะอาจารย์

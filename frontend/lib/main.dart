@@ -54,7 +54,8 @@ class MyApp extends StatelessWidget {
       case '/register':
         return MaterialPageRoute(builder: (_) => RegisterScreen());
       case '/home':
-        return MaterialPageRoute(builder: (_) => HomeScreen());
+        // เปลี่ยนให้ /home ไปที่ ClassroomHomeScreen แทน HomeScreen
+        return MaterialPageRoute(builder: (_) => const ClassroomHomeScreen());
       case '/verify-otp':
         {
           final email = settings.arguments as String?;
@@ -76,7 +77,7 @@ class MyApp extends StatelessWidget {
           );
         }
       case '/admin-dashboard':
-        return MaterialPageRoute(builder: (_) => AdminDashboardScreen());
+        return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
 
       //  กล้องสำหรับอัปโหลด/ตรวจสอบใบหน้า
       case '/upload-face':
@@ -135,7 +136,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: initialRoute,
       onGenerateRoute: _onGenerateRoute,
-   routes: {
+      routes: {
         //  verify-face สำหรับตรวจยืนยัน
         '/verify-face': (context) => const VerifyFaceRoute(),
 
