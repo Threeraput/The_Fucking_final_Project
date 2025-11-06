@@ -54,12 +54,9 @@ class UserLogin(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    username: Optional[str] = Field(None, min_length=3, max_length=80)
-    first_name: Optional[str] = Field(None, min_length=1, max_length=60)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=60)
-    email: Optional[EmailStr] = Field(None, max_length=120)
+    username: Optional[str] = Field(None, max_length=80)
+    first_name: Optional[str] = Field(None, max_length=60)
+    last_name: Optional[str] = Field(None, max_length=60)
     student_id: Optional[str] = Field(None, max_length=20)
     teacher_id: Optional[str] = Field(None, max_length=20)
     is_active: Optional[bool] = None
@@ -75,6 +72,7 @@ class UserResponse(UserBase):
     updated_at: datetime
     last_login_at: Optional[datetime] = None
     roles: List[str] = Field(default_factory=list)  # หลีกเลี่ยง mutable default
+    avatar_url: Optional[str] = None
 
 
 # ---------------------------

@@ -12,7 +12,13 @@ from app.api.v1 import announcements as announcements_router
 from app.api.v1 import classwork_simple
 from app.api.v1 import attendance_report
 from app.api.v1 import attendance_report_detail
+from pathlib import Path
 # ใช้ asynccontextmanager สำหรับ startup/shutdown events (ดีกว่า @app.on_event)
+
+
+MEDIA_ROOT = Path("media")
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup event
@@ -51,6 +57,9 @@ app.add_middleware(
 )
 
 # รวม API Routers
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/workpdf", StaticFiles(directory="workpdf"), name="workpdf")
+app.mount("/media", StaticFiles(directory=str(MEDIA_ROOT)), name="media")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(face_recognition.router, prefix="/api/v1")
@@ -58,8 +67,6 @@ app.include_router(face_recognition.router, prefix="/api/v1")
 app.include_router(classes.router, prefix="/api/v1")
 app.include_router(attendance.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/workpdf", StaticFiles(directory="workpdf"), name="workpdf")
 app.include_router(sessions.router, prefix="/api/v1")
 app.include_router(classwork_simple.router, prefix="/api/v1")
 app.include_router(announcements_router.router, prefix="/api/v1")

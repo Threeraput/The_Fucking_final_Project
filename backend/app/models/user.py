@@ -26,7 +26,7 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login_at = Column(DateTime, nullable=True)
-
+    avatar_url = Column(String(255), nullable=True)
     # Relationships
     # User -> Roles (Many-to-Many)
     roles = relationship("Role", secondary=user_roles, back_populates="users")
