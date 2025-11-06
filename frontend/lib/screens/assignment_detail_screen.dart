@@ -156,7 +156,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
         child: FutureBuilder<List<ClassworkSubmission>>(
           future: _future,
           builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done) {
+            if (snap.connectionState != ConnectionState.done) { // การโหลด loading
               return const Center(child: CircularProgressIndicator(
                 color: Colors.blue,
               ));
@@ -190,7 +190,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🧑‍🎓 ชื่อผู้เรียน
+        // ชื่อผู้เรียน
         Text(
           'นักเรียน: ${_displayName(s.studentId)}',
           style: const TextStyle(
@@ -200,7 +200,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
         ),
         const SizedBox(height: 6),
 
-        // 🕒 วันที่ส่ง
+        // วันที่ส่ง
         if (s.submittedAt != null)
           Text.rich(
             TextSpan(
@@ -215,7 +215,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
             ),
           ),
 
-        // 📋 สถานะ
+        // สถานะ
         Text.rich(
           TextSpan(
             text: 'สถานะ: ',
@@ -235,7 +235,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
         ),
         const SizedBox(height: 8),
 
-        // 📁 ปุ่มเปิดไฟล์
+        // ปุ่มเปิดไฟล์
         if (s.contentUrl != null)
           FilledButton.tonal(
             onPressed: () => _openSubmissionFile(s.contentUrl!),
@@ -261,7 +261,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
 
         const SizedBox(height: 12),
 
-        // 🧮 ส่วนให้คะแนน
+        // ส่วนให้คะแนน
         Row(
           children: [
             Expanded(

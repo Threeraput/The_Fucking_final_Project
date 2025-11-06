@@ -36,7 +36,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       });
     }
   }
-
   Future<void> _approveTeacher(String userId) async {
     try {
       await AuthService.approveTeacher(userId);
@@ -45,7 +44,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
       _fetchPendingTeachers(); // รีเฟรชรายการ
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar( // กรอบการเเจ้งเตือน สีเทา ๆ ที่ขึ้นมา
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
@@ -55,14 +54,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Admin Dashboard')),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(
+      body: _isLoading 
+          ? Center(child: CircularProgressIndicator( // แสดง วงกลมหมุน loading
               color: Colors.blue,
           ))
           : _errorMessage != null
               ? Center(child: Text(_errorMessage!))
               : _pendingTeachers.isEmpty
-                  ? Center(child: Text('ไม่มี Teacher ที่รอการอนุมัติ'))
+                  ? Center(child: Text('ไม่มี Teacher ที่รอการอนุมัติ')) // ถ้า โหลดเเล้วเกิด _error ก็จะเเจ้ง
                   : ListView.builder(
                       itemCount: _pendingTeachers.length,
                       itemBuilder: (context, index) {

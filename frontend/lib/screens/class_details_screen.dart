@@ -274,7 +274,11 @@ class _StreamTabState extends State<_StreamTab> {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    Text('Code: ${c.code ?? '-'}'),
+                    Text(
+                      style: TextStyle(
+                        color: Colors.white
+                      ),
+                      'Code: ${c.code ?? '-'}'),
                     const SizedBox(height: 4),
                     Text(
                       style: const TextStyle(color: Colors.white70),
