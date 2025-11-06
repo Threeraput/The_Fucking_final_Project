@@ -12,7 +12,7 @@ PROFILE_UPLOAD_DIR = MEDIA_ROOT / "profile_upload"
 PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)  # สร้างโฟลเดอร์ถ้าไม่มี
 
 ALLOWED_TYPES = {"jpeg", "png"}
-MAX_SIZE = 3 * 1024 * 1024  # 3MB
+MAX_SIZE = 10 * 1024 * 1024  # 3MB
 
 def _ext_from_kind(kind: str) -> str:
     return ".jpg" if kind == "jpeg" else ".png"

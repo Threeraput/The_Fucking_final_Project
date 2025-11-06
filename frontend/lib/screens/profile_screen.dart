@@ -3,7 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:frontend/models/users.dart';
 import 'package:frontend/services/user_service.dart';
-import 'package:frontend/services/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,11 +16,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   bool _saving = false;
 
+  // โหมดแก้ไข: ปิดอยู่โดยค่าเริ่มต้น
+  bool _editing = false;
+
   final _usernameCtrl = TextEditingController();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
-  final _studentIdCtrl = TextEditingController();
-  final _teacherIdCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -29,19 +29,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadMe();
   }
 
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadMe() async {
     setState(() {
       _loading = true;
     });
     try {
-      // โหลดข้อมูลล่าสุดจากเซิร์ฟเวอร์ (เพื่อได้ avatarUrl ปัจจุบัน)
-      final fresh = await UserService.fetchMe();
-      _me = fresh;
-      _usernameCtrl.text = fresh.username;
-      _firstNameCtrl.text = fresh.firstName ?? '';
-      _lastNameCtrl.text = fresh.lastName ?? '';
-      _studentIdCtrl.text = fresh.studentId ?? '';
-      _teacherIdCtrl.text = fresh.teacherId ?? '';
+      final fresh = await UserService.fetchMe(); // โหลดล่าสุด (มี avatar_url)
+      _applyUser(fresh);
       setState(() {
         _loading = false;
       });
@@ -57,8 +59,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _applyUser(User u) {
+    _me = u;
+    _usernameCtrl.text = u.username;
+    _firstNameCtrl.text = u.firstName ?? '';
+    _lastNameCtrl.text = u.lastName ?? '';
+  }
+
+  void _toggleEdit() {
+    setState(() => _editing = true);
+  }
+
+  void _cancelEdit() {
+    if (_me != null) _applyUser(_me!);
+    setState(() => _editing = false);
+  }
+
   Future<void> _pickAndUploadAvatar() async {
-    if (_me == null) return;
+    if (_me == null || !_editing) return; // อนุญาตเมื่ออยู่ในโหมดแก้ไข
     try {
       final res = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -70,12 +88,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (path == null) return;
 
       setState(() => _saving = true);
-
-      // อัปโหลดรูป
       final updatedUser = await UserService.uploadAvatar(File(path));
-
       setState(() {
-        _me = updatedUser;
+        _applyUser(updatedUser);
         _saving = false;
       });
 
@@ -95,12 +110,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _deleteAvatar() async {
-    if (_me == null) return;
+    if (_me == null || !_editing) return; // อนุญาตเมื่ออยู่ในโหมดแก้ไข
     try {
       setState(() => _saving = true);
       final updatedUser = await UserService.deleteAvatar();
       setState(() {
-        _me = updatedUser;
+        _applyUser(updatedUser);
         _saving = false;
       });
       if (mounted) {
@@ -122,27 +137,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_me == null) return;
     try {
       setState(() => _saving = true);
+      // ไม่อัปเดตรหัสนักเรียน/อาจารย์ในหน้าโปรไฟล์
       final updated = await UserService.updateUser(
         userId: _me!.userId,
         username: _usernameCtrl.text,
         firstName: _firstNameCtrl.text,
         lastName: _lastNameCtrl.text,
-        studentId: _studentIdCtrl.text,
-        teacherId: _teacherIdCtrl.text,
       );
       setState(() {
-        _me = updated;
+        _applyUser(updated);
         _saving = false;
+        _editing = false;
       });
-
-      // อัปเดต local cache ถ้าคุณมีเมธอดให้เก็บ (อาจไม่มีในโปรเจ็กต์)
-      // await AuthService.setCurrentUserToLocal(updated);
 
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('บันทึกโปรไฟล์สำเร็จ')));
-        Navigator.pop(context, true); // ส่ง true กลับเพื่อให้หน้าก่อนรีเฟรช
+        Navigator.pop(context, true);
       }
     } catch (e) {
       setState(() => _saving = false);
@@ -154,6 +166,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // ===== Helpers =====
+  bool _hasRole(String role) => _me?.roles.contains(role) ?? false;
+  String? _nz(String? s) => (s == null || s.trim().isEmpty) ? null : s.trim();
+
   @override
   Widget build(BuildContext context) {
     final me = _me;
@@ -162,16 +178,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('โปรไฟล์ของฉัน'),
         actions: [
-          TextButton(
-            onPressed: _saving ? null : _saveProfile,
-            child: _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('บันทึก'),
-          ),
+          if (_editing) ...[
+            TextButton(
+              onPressed: _saving ? null : _saveProfile,
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('บันทึก'),
+            ),
+            TextButton(
+              onPressed: _saving ? null : _cancelEdit,
+              child: const Text('ยกเลิก'),
+            ),
+          ] else
+            IconButton(
+              tooltip: 'แก้ไข',
+              icon: const Icon(Icons.edit),
+              onPressed: _toggleEdit,
+            ),
         ],
       ),
       body: _loading
@@ -182,7 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Avatar
+                  // ===== Avatar =====
                   Builder(
                     builder: (context) {
                       final imgUrl = UserService.absoluteAvatarUrl(
@@ -214,17 +241,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: _saving
+                                onPressed: (!_editing || _saving)
                                     ? null
                                     : _pickAndUploadAvatar,
                                 icon: const Icon(Icons.photo),
                                 label: const Text('เปลี่ยนรูป'),
                               ),
                               const SizedBox(width: 8),
-                              if (me.avatarUrl != null &&
-                                  me.avatarUrl!.isNotEmpty)
+                              if (_nz(me.avatarUrl) != null)
                                 TextButton.icon(
-                                  onPressed: _saving ? null : _deleteAvatar,
+                                  onPressed: (!_editing || _saving)
+                                      ? null
+                                      : _deleteAvatar,
                                   icon: const Icon(
                                     Icons.delete,
                                     color: Colors.red,
@@ -241,7 +269,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Email (read-only)
+
+                  // ===== Email (read-only) =====
                   TextFormField(
                     initialValue: me.email ?? '',
                     readOnly: true,
@@ -251,16 +280,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  // ===== Username =====
                   TextField(
                     controller: _usernameCtrl,
+                    enabled: _editing && !_saving,
                     decoration: const InputDecoration(
                       labelText: 'ชื่อผู้ใช้',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  // ===== First / Last name =====
                   TextField(
                     controller: _firstNameCtrl,
+                    enabled: _editing && !_saving,
                     decoration: const InputDecoration(
                       labelText: 'ชื่อจริง',
                       prefixIcon: Icon(Icons.badge_outlined),
@@ -269,27 +304,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _lastNameCtrl,
+                    enabled: _editing && !_saving,
                     decoration: const InputDecoration(
                       labelText: 'นามสกุล',
                       prefixIcon: Icon(Icons.badge_outlined),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _studentIdCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'รหัสนักเรียน',
-                      prefixIcon: Icon(Icons.school_outlined),
+
+                  // ===== แสดงรหัสตามบทบาท (read-only) =====
+                  if (_hasRole('teacher') && _nz(me.teacherId) != null) ...[
+                    TextFormField(
+                      initialValue: me.teacherId!,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'รหัสอาจารย์ (Teacher ID)',
+                        prefixIcon: Icon(Icons.school_outlined),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _teacherIdCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'รหัสอาจารย์',
-                      prefixIcon: Icon(Icons.co_present_outlined),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_hasRole('student') && _nz(me.studentId) != null) ...[
+                    TextFormField(
+                      initialValue: me.studentId!,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'รหัสนักเรียน (Student ID)',
+                        prefixIcon: Icon(Icons.badge),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // หมายเหตุ: ไม่เปิดให้แก้ studentId/teacherId ที่หน้าจอนี้
                 ],
               ),
             ),

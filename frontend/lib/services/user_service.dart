@@ -16,7 +16,7 @@ class ApiException implements Exception {
 
 class UserService {
   // -------------------------
-  // 🔧 กำหนดค่าเซิร์ฟเวอร์ของคุณที่นี่
+  //  กำหนดค่าเซิร์ฟเวอร์ของคุณที่นี่
   // -------------------------
   static const String _baseUrlRoot =
       'http://192.168.0.200:8000'; // เปลี่ยนให้ตรงกับ backend
@@ -25,7 +25,7 @@ class UserService {
   static const Duration _timeout = Duration(seconds: 20);
 
   // -------------------------
-  // 🧩 helper สำหรับแปลง JSON หรือโยน error
+  //  helper สำหรับแปลง JSON หรือโยน error
   // -------------------------
   static Map<String, dynamic> _decodeOrThrow(
     http.Response res, {
@@ -75,15 +75,19 @@ class UserService {
     bool? isActive,
   }) async {
     final token = await AuthService.getAccessToken();
+   // lib/services/user_service.dart (เฉพาะ body ของ updateUser)
     final body = <String, dynamic>{
       if (username != null && username.trim().isNotEmpty)
         'username': username.trim(),
       if (firstName != null) 'first_name': firstName.trim(),
       if (lastName != null) 'last_name': lastName.trim(),
-      if (studentId != null) 'student_id': studentId.trim(),
-      if (teacherId != null) 'teacher_id': teacherId.trim(),
+      if (studentId != null && studentId.trim().isNotEmpty)
+        'student_id': studentId.trim(), //  เปลี่ยนตรงนี้
+      if (teacherId != null && teacherId.trim().isNotEmpty)
+        'teacher_id': teacherId.trim(), //  เปลี่ยนตรงนี้
       if (isActive != null) 'is_active': isActive,
     };
+
 
     final res = await http
         .put(
@@ -101,7 +105,7 @@ class UserService {
   }
 
   // -------------------------
-  // 🖼️ อัปโหลดรูปโปรไฟล์ (JPEG/PNG ≤ 3MB)
+  //  อัปโหลดรูปโปรไฟล์ (JPEG/PNG ≤ 3MB)
   // -------------------------
   static Future<User> uploadAvatar(File file) async {
     final token = await AuthService.getAccessToken();
@@ -124,7 +128,7 @@ class UserService {
   }
 
   // -------------------------
-  // 🗑️ ลบรูปโปรไฟล์
+  //  ลบรูปโปรไฟล์
   // -------------------------
   static Future<User> deleteAvatar() async {
     final token = await AuthService.getAccessToken();
@@ -140,7 +144,7 @@ class UserService {
   }
 
   // -------------------------
-  // 🌐 ใช้ใน UI เพื่อแปลง avatarUrl -> URL เต็ม
+  //  ใช้ใน UI เพื่อแปลง avatarUrl -> URL เต็ม
   // -------------------------
   static String? absoluteAvatarUrl(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) return null;

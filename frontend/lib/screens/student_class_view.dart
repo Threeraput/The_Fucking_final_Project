@@ -16,6 +16,9 @@ import 'package:frontend/services/class_service.dart';
 import 'package:frontend/models/classroom.dart';
 import 'package:frontend/models/users.dart';
 
+// ✅ ใช้สำหรับแปลง avatarUrl ให้เป็น URL เต็ม
+import 'package:frontend/services/user_service.dart';
+
 class StudentClassView extends StatefulWidget {
   final String classId; // <- ต้องเป็น UUID ของคลาส
   final String className;
@@ -323,7 +326,7 @@ class _StudentReportTab extends StatelessWidget {
 }
 
 /// ======================
-/// 🔹 PEOPLE TAB
+/// 🔹 PEOPLE TAB (Student)
 /// ======================
 class _StudentPeopleTab extends StatefulWidget {
   final String classId;
@@ -372,6 +375,23 @@ class _StudentPeopleTabState extends State<_StudentPeopleTab> {
 
   String _displayUserName(User u) => u.displayName;
 
+  CircleAvatar _avatarFor(User u, {double radius = 20}) {
+    final url = UserService.absoluteAvatarUrl(u.avatarUrl);
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(radius: radius, backgroundImage: NetworkImage(url));
+    }
+    final initial =
+        (u.username.isNotEmpty
+                ? u.username[0]
+                : (u.email?.isNotEmpty == true ? u.email![0] : '?'))
+            .toUpperCase();
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade300,
+      child: Text(initial, style: const TextStyle(color: Colors.black87)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -412,7 +432,16 @@ class _StudentPeopleTabState extends State<_StudentPeopleTab> {
           Text('Teacher', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
+            leading: cls?.teacher != null
+                ? _avatarFor(cls!.teacher!, radius: 22)
+                : CircleAvatar(
+                    radius: 22,
+                    child: Text(
+                      widget.fallbackTeacherName.isNotEmpty
+                          ? widget.fallbackTeacherName[0].toUpperCase()
+                          : '?',
+                    ),
+                  ),
             title: Text(
               cls?.teacher != null
                   ? _displayUserName(cls!.teacher!)
@@ -436,7 +465,7 @@ class _StudentPeopleTabState extends State<_StudentPeopleTab> {
           else
             ...students.map(
               (s) => ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                leading: _avatarFor(s),
                 title: Text(_displayUserName(s)),
                 subtitle: Text(s.email ?? ''),
               ),

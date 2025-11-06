@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
-
+from app.models import User
 from pydantic import BaseModel, EmailStr, Field
 from pydantic.config import ConfigDict  # Pydantic v2
 
@@ -23,6 +23,9 @@ class UserPublic(BaseModel):
     is_active: Optional[bool] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    student_id: Optional[str] = None
+    teacher_id: Optional[str] = None
+    avatar_url: Optional[str] = None
     # เก็บ role เป็นชื่อ string
     roles: List[str] = Field(default_factory=list)
 
@@ -73,6 +76,8 @@ class UserResponse(UserBase):
     last_login_at: Optional[datetime] = None
     roles: List[str] = Field(default_factory=list)  # หลีกเลี่ยง mutable default
     avatar_url: Optional[str] = None
+    student_id: Optional[str] = Field(None, max_length=20)
+    teacher_id: Optional[str] = Field(None, max_length=20)
 
 
 # ---------------------------
