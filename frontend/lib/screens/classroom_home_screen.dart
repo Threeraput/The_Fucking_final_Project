@@ -14,6 +14,9 @@ import 'package:frontend/screens/profile_screen.dart';
 import 'package:frontend/services/user_service.dart';
 import 'package:frontend/screens/admin_dashboard_screen.dart';
 
+// ✅ ใช้ API แอดมินสำหรับดึงคลาสทั้งหมดในระบบ
+import 'package:frontend/services/admin_service.dart';
+
 class ClassroomHomeScreen extends StatefulWidget {
   const ClassroomHomeScreen({super.key});
 
@@ -26,11 +29,14 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   Future<List<Classroom>>? _futureTaught;
   Future<List<Classroom>>? _futureJoined;
 
+  // ✅ แอดมิน: โหลด "คลาสทั้งหมดในระบบ"
+  Future<List<_AdminClassItem>>? _futureAllClasses;
+
   bool get _isTeacher =>
       _me?.roles.contains('teacher') == true ||
       _me?.roles.contains('admin') == true;
 
-        bool get _isAdmin =>
+  bool get _isAdmin =>
       _me?.roles.any((r) => r.toLowerCase() == 'admin') == true;
 
   @override
@@ -40,6 +46,14 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   }
 
   void _setupFutures() {
+    if (_isAdmin) {
+      // ✅ ถ้าเป็นแอดมิน: แทนที่ด้วยการโหลด "ทุกคลาสในระบบ"
+      _futureAllClasses = _fetchAllClassesForAdmin();
+      _futureTaught = null;
+      _futureJoined = null;
+      return;
+    }
+
     if (_isTeacher) {
       _futureTaught = ClassService.getTaughtClasses();
       _futureJoined = null;
@@ -116,8 +130,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
     }
   }
 
-
-   Future<void> _openAdmin() async {
+  Future<void> _openAdmin() async {
     if (!_isAdmin) {
       ScaffoldMessenger.of(
         context,
@@ -127,6 +140,29 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+  }
+
+  // =========================
+  // ✅ ADMIN: โหลดคลาสทั้งหมดในระบบผ่าน AdminService
+  // =========================
+  Future<List<_AdminClassItem>> _fetchAllClassesForAdmin() async {
+    final page = await AdminService.listClasses(limit: 200, offset: 0);
+    final items = (page['items'] as List<dynamic>? ?? []);
+    return items.map((e) {
+      final m = e as Map<String, dynamic>;
+      final teacher = (m['teacher'] as Map<String, dynamic>?) ?? {};
+      return _AdminClassItem(
+        classId: (m['class_id'] ?? '').toString(),
+        name: (m['name'] ?? '').toString(),
+        code: (m['code'] ?? '').toString(),
+        studentCount: (m['student_count'] ?? 0) as int,
+        teacherName: (teacher['username'] ??
+                teacher['full_name'] ??
+                teacher['email'] ??
+                '-')
+            .toString(),
+      );
+    }).toList();
   }
 
   Drawer _buildDrawer() {
@@ -162,9 +198,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                 },
                 child: CircleAvatar(
                   backgroundColor: Colors.deepOrangeAccent,
-                  backgroundImage: avatarAbs != null
-                      ? NetworkImage(avatarAbs)
-                      : null,
+                  backgroundImage:
+                      avatarAbs != null ? NetworkImage(avatarAbs) : null,
                   child: avatarAbs == null
                       ? Text(
                           (me.username.isNotEmpty ? me.username[0] : '?')
@@ -192,19 +227,17 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.class_, color: Colors.blueAccent),
-                    title: Text(_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน'),
+                    title: Text(_isAdmin
+                        ? 'คลาสทั้งหมด (แอดมิน)'
+                        : (_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน')),
                     onTap: () => Navigator.pop(context),
                   ),
 
-                  const Divider(),
-
-                   if (_isAdmin) ...[
+                  if (_isAdmin) ...[
                     const Divider(),
                     const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 6,
-                      ),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: Text(
                         'ADMIN',
                         style: TextStyle(
@@ -230,7 +263,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                   const Divider(),
 
                   // 🔹 เมนูเฉพาะอาจารย์
-                  if (_isTeacher)
+                  if (_isTeacher && !_isAdmin)
                     ListTile(
                       leading: const Icon(Icons.add_circle_outline),
                       title: const Text('สร้างคลาสใหม่'),
@@ -241,7 +274,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                     ),
 
                   // 🔹 เมนูเฉพาะนักเรียน
-                  if (!_isTeacher)
+                  if (!_isTeacher && !_isAdmin)
                     ListTile(
                       leading: const Icon(Icons.group_add),
                       title: const Text('เข้าร่วมคลาส'),
@@ -298,20 +331,19 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                                 ),
                                 child: RichText(
                                   textAlign: TextAlign.center,
-                                  text: TextSpan(
+                                  text: const TextSpan(
                                     style: TextStyle(
-                                      fontSize: contentFontSize,
+                                      fontSize: 15,
                                       height: 1.4,
                                       color: Colors.black87,
                                     ),
-                                    children: const [
+                                    children: [
                                       TextSpan(
                                         text:
                                             'คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลใบหน้าของคุณออกจากระบบ?\n',
                                       ),
                                       TextSpan(
                                         text: 'การกระทำนี้ ',
-                                        style: TextStyle(color: Colors.black87),
                                       ),
                                       TextSpan(
                                         text: 'ไม่สามารถกู้คืนได้',
@@ -325,41 +357,20 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                                 ),
                               ),
                               actionsAlignment: MainAxisAlignment.spaceEvenly,
-                              actionsPadding: EdgeInsets.only(
-                                bottom: paddingSize * 0.5,
-                              ),
                               actions: [
                                 TextButton(
-                                  style: ButtonStyle(
-                                    overlayColor: MaterialStateProperty.all(
-                                      Colors.transparent,
-                                    ),
-                                  ),
                                   onPressed: () => Navigator.pop(ctx, false),
-                                  child: Text(
+                                  child: const Text(
                                     'ยกเลิก',
-                                    style: TextStyle(
-                                      fontSize: buttonFontSize,
-                                      color: Colors.grey[700],
-                                    ),
+                                    style: TextStyle(color: Colors.grey),
                                   ),
                                 ),
                                 FilledButton(
                                   style: FilledButton.styleFrom(
                                     backgroundColor: Colors.redAccent,
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: screenWidth * 0.06,
-                                      vertical: screenWidth * 0.025,
-                                    ),
                                   ),
                                   onPressed: () => Navigator.pop(ctx, true),
-                                  child: Text(
-                                    'ลบ',
-                                    style: TextStyle(
-                                      fontSize: buttonFontSize,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                                  child: const Text('ลบ'),
                                 ),
                               ],
                             );
@@ -512,13 +523,12 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final me = _me;
-    final avatarAbs = me != null
-        ? UserService.absoluteAvatarUrl(me.avatarUrl)
-        : null;
+    final avatarAbs =
+        me != null ? UserService.absoluteAvatarUrl(me.avatarUrl) : null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Classroom'),
+        title: Text(_isAdmin ? 'All Classes (Admin)' : 'Classroom'),
         actions: [
           // ✅ รูปโปรไฟล์กลมๆ ทางขวาบนของ AppBar
           Padding(
@@ -528,9 +538,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: Colors.grey.shade300,
-                backgroundImage: (avatarAbs != null)
-                    ? NetworkImage(avatarAbs)
-                    : null,
+                backgroundImage:
+                    (avatarAbs != null) ? NetworkImage(avatarAbs) : null,
                 child: (avatarAbs == null)
                     ? Icon(Icons.person, color: Colors.grey.shade700)
                     : null,
@@ -540,27 +549,34 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         ],
       ),
       drawer: _buildDrawer(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _isTeacher ? _openCreate : _openJoin,
-        tooltip: _isTeacher ? 'สร้างคลาสใหม่' : 'เข้าร่วมคลาส',
-        backgroundColor: Colors.blueAccent,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      floatingActionButton: (!_isAdmin)
+          ? FloatingActionButton(
+              onPressed: _isTeacher ? _openCreate : _openJoin,
+              tooltip: _isTeacher ? 'สร้างคลาสใหม่' : 'เข้าร่วมคลาส',
+              backgroundColor: Colors.blueAccent,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
       body: me == null
           ? const Center(
               child: CircularProgressIndicator(
                 color: Color.fromARGB(255, 28, 178, 248),
               ),
             )
-          : (_isTeacher
-                ? _TeacherClasses(
-                    futureTaught: _futureTaught,
-                    onRefresh: _refresh,
-                  )
-                : _StudentClasses(
-                    futureJoined: _futureJoined,
-                    onRefresh: _refresh,
-                  )),
+          : _isAdmin
+              ? _AdminClasses(
+                  futureAll: _futureAllClasses,
+                  onRefresh: _refresh,
+                )
+              : (_isTeacher
+                  ? _TeacherClasses(
+                      futureTaught: _futureTaught,
+                      onRefresh: _refresh,
+                    )
+                  : _StudentClasses(
+                      futureJoined: _futureJoined,
+                      onRefresh: _refresh,
+                    )),
     );
   }
 }
@@ -640,6 +656,87 @@ class _StudentClasses extends StatelessWidget {
             itemCount: data.length,
             itemBuilder: (_, i) =>
                 _ClassCard(c: data[i], isTeacher: false, onRefresh: onRefresh),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AdminClasses extends StatelessWidget {
+  final Future<List<_AdminClassItem>>? futureAll;
+  final Future<void> Function() onRefresh;
+  const _AdminClasses({required this.futureAll, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<_AdminClassItem>>(
+      future: futureAll,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: Color.fromARGB(255, 28, 178, 248),
+            ),
+          );
+        }
+        if (snap.hasError) {
+          return Center(child: Text('เกิดข้อผิดพลาด: ${snap.error}'));
+        }
+        final data = snap.data ?? const <_AdminClassItem>[];
+        if (data.isEmpty) {
+          return const _EmptyState(
+            title: 'ยังไม่มีคลาสในระบบ',
+            subtitle: 'เริ่มสร้างคลาสแรกจาก Admin Dashboard',
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: onRefresh,
+          child: ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: data.length,
+            itemBuilder: (_, i) {
+              final it = data[i];
+              final color = getClassColor(it.name);
+              return Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 3,
+                color: color,
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  title: Text(
+                    it.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Teacher: ${it.teacherName}  •  Students: ${it.studentCount}',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.92),
+                    ),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios,
+                      color: Colors.white, size: 16),
+                  onTap: () {
+                    // เปิดหน้า class — แนะนำใช้ ClassDetailsScreen (แอดมินถือเป็น teacher view)
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ClassDetailsScreen(classId: it.classId),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
         );
       },
@@ -926,4 +1023,21 @@ class _ClassCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ✅ โครงสร้างข้อมูลคลาสแบบย่อสำหรับแอดมิน (มาจาก /admin/classes)
+class _AdminClassItem {
+  final String classId;
+  final String name;
+  final String code;
+  final int studentCount;
+  final String teacherName;
+
+  _AdminClassItem({
+    required this.classId,
+    required this.name,
+    required this.code,
+    required this.studentCount,
+    required this.teacherName,
+  });
 }
