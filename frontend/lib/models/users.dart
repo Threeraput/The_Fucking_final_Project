@@ -1,6 +1,8 @@
 // lib/models/user.dart
 import 'package:meta/meta.dart';
 
+import 'package:meta/meta.dart';
+
 @immutable
 class User {
   final String userId;
@@ -76,6 +78,7 @@ class User {
       lastLoginAt: _dt(json['last_login_at']),
       roles: roles,
       fullName: json['full_name']?.toString(),
+      // ✅ แม็ปค่า avatar_url -> avatarUrl (แก้ตัวอักษรผิดพลาดเดิม)
       avatarUrl: json['avatar_url']?.toString(),
     );
   }
@@ -137,7 +140,7 @@ class User {
   /// ตัวอย่างใช้: NetworkImage(user.avatarAbsoluteUrl(BASE_URL_ROOT))
   String? avatarAbsoluteUrl(String baseUrlRoot) {
     if (avatarUrl == null || avatarUrl!.isEmpty) return null;
-    // ถ้า backend คืนเป็น path (/media/...), ต่อให้เป็น URL เต็ม
+    // ถ้า backend คืนเป็น URL เต็มแล้ว
     if (avatarUrl!.startsWith('http')) return avatarUrl!;
     return '$baseUrlRoot${avatarUrl!}';
   }

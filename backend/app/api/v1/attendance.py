@@ -25,6 +25,8 @@ from app.core.deps import get_current_user, role_required  # <- ถ้าคุ�
 from app.services.attendance_service import record_check_in , handle_reverification , manual_override_attendance
 from app.services.location_service import update_teacher_location_log, log_student_location
 from datetime import datetime, timezone
+from app.services.attendance_service import identify_user 
+REVERIFY_MIN_SIMILARITY = 0.45  # กำหนดค่าความเหมือนขั้นต่ำสำหรับการยืนยันตัวตนซ้ำ
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -127,15 +129,17 @@ async def track_student_location(
 # ------------------------------------
 # 4. POST /attendance/re-verify (Student: ตอบสนองต่อการสุ่มตรวจซ้ำ)
 # ------------------------------------
+
 @router.post("/re-verify", response_model=AttendanceResponse, status_code=status.HTTP_200_OK)
 async def re_verify_check_in(
-    form: ReverifyRequest = Depends(ReverifyRequest.as_form),  # ← อ่านจาก multipart/form-data
+    form: ReverifyRequest = Depends(ReverifyRequest.as_form),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     นักเรียนตอบสนองต่อคำสั่งสุ่มตรวจสอบกลางคาบเรียน (Face ID + Location).
+    เงื่อนไขใหม่: ใบหน้าที่ส่งมาต้องเป็นของผู้ใช้ปัจจุบันเท่านั้น
     """
     if "student" not in [role.name for role in current_user.roles]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
@@ -145,21 +149,36 @@ async def re_verify_check_in(
 
     image_bytes = await file.read()
 
+    #  บังคับยืนยันตัวตน: ใบหน้าที่ส่งมาต้องตรงกับ current_user เท่านั้น
+    try:
+        matched_user_id, score = identify_user(image_bytes)
+    except Exception as e:
+        # กันเคส service ล่ม/ไม่พร้อมใช้งาน
+        raise HTTPException(status_code=500, detail=f"Face service error: {e}")
+
+    if matched_user_id is None:
+        raise HTTPException(status_code=403, detail="Face not recognized.")
+
+    if str(matched_user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Face does not match the logged-in user.")
+
+    if score is not None and score < REVERIFY_MIN_SIMILARITY:
+        raise HTTPException(status_code=403, detail="Face similarity too low.")
+
+    #  ผ่านตัวตนแล้ว จึงค่อยอัปเดตสถานะ re-verify ในระบบ
     result = handle_reverification(
         db=db,
-        session_id=form.session_id,           # ← ใช้ session_id (ไม่ใช่ class_id)
+        session_id=form.session_id,
         student_id=current_user.user_id,
         image_bytes=image_bytes,
         student_lat=form.latitude,
         student_lon=form.longitude,
     )
 
-    # ส่งคืนตาม schema ของคุณ (ถ้า AttendanceResponse ใช้ from_orm / model_validate)
     try:
         return AttendanceResponse.model_validate(result, from_attributes=True)
     except Exception:
         return AttendanceResponse.from_orm(result)
-
 # ------------------------------------
 # 5. PATCH /attendance/override/{attendance_id} (Teacher/Admin Only)
 # ------------------------------------

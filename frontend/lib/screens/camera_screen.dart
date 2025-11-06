@@ -349,7 +349,7 @@ Future<void> _captureAndProcess() async {
       appBar: AppBar(title: Text(appBarTitle),
         backgroundColor: Colors.transparent, // ✅ โปร่งใส
         elevation: 0, // ✅ ตัดเงาออก
-        foregroundColor: Colors.white, // ✅ เปลี่ยนสีไอคอนเป็นดำ
+        foregroundColor: Colors.black, // ✅ เปลี่ยนสีไอคอนเป็นดำ
       ),
       body: controller == null
           ? const Center(child: CircularProgressIndicator(
