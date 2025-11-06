@@ -4,21 +4,50 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 import uuid
 from datetime import datetime
+import string
+import random
 
 from app.database import get_db
 from app.schemas.user_schema import UserResponse
-from app.schemas.admin_schema import AdminUsersPage, SystemSummaryReport, AdminClassesPage, AdminClassSummary
+from app.schemas.admin_schema import (
+    AdminUsersPage,
+    SystemSummaryReport,
+    AdminClassesPage,
+    AdminClassSummary,
+    AdminCreateClass,  # ✅ เพิ่ม schema สำหรับสร้างคลาส
+)
 from app.models.user import User
 from app.models.role import Role
 from app.models.class_model import Class as ClassModel
 from app.models.attendance import Attendance
 from app.models.association import user_roles
-# ✅ เพิ่ม import ตารางนักเรียนในคลาส (association table)
+# ✅ association table สำหรับนับนักเรียนในคลาส
 from app.models.association import class_students
 from app.services.db_service import approve_teacher
 from app.core.deps import get_current_admin_user
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+
+# ✅ helper: สร้าง code ที่ไม่ซ้ำ
+def _generate_unique_class_code(db: Session, length: int = 6) -> str:
+    chars = string.ascii_uppercase + string.digits
+    tries = 0
+    while True:
+        code = "".join(random.choices(chars, k=length))
+        exists = (
+            db.query(ClassModel)
+            .filter(func.lower(ClassModel.code) == code.lower())
+            .first()
+        )
+        if not exists:
+            return code
+        tries += 1
+        if tries > 20:
+            # กันไว้กรณีชนเยอะ เพิ่มความยาว
+            length += 1
+            tries = 0
 
 @router.get("/status", response_model=dict)
 async def get_admin_status(current_user: User = Depends(get_current_admin_user)):
@@ -48,7 +77,9 @@ async def approve_user_as_teacher(
         created_at=approved_user.created_at,
         updated_at=approved_user.updated_at,
         last_login_at=approved_user.last_login_at,
-        roles=user_roles
+        roles=user_roles,
+        # ✅ ส่ง avatar_url ออกไปเพื่อให้ Frontend แสดงรูปจริงได้
+        avatar_url=getattr(approved_user, "avatar_url", None),
     )
 
 @router.get("/pending-teachers", response_model=List[UserResponse])
@@ -72,13 +103,15 @@ async def get_pending_teachers(
                 created_at=user.created_at,
                 updated_at=user.updated_at,
                 last_login_at=user.last_login_at,
-                roles=user_roles
+                roles=user_roles,
+                # ✅ ส่ง avatar_url ออกด้วย
+                avatar_url=getattr(user, "avatar_url", None),
             )
         )
     return response_list
 
 # ===========================
-# ✅ NEW: Admin - List all users (with search, role filter, pagination)
+# ✅ Admin - List all users (with search, role filter, pagination)
 # ===========================
 @router.get("/users", response_model=AdminUsersPage)
 async def admin_list_users(
@@ -128,13 +161,15 @@ async def admin_list_users(
                 updated_at=u.updated_at,
                 last_login_at=u.last_login_at,
                 roles=[r.name for r in u.roles],
+                # ✅ ส่ง avatar_url ออกด้วย
+                avatar_url=getattr(u, "avatar_url", None),
             )
         )
 
     return AdminUsersPage(total=total, limit=limit, offset=offset, items=items)
 
 # ===========================
-# ✅ NEW: Admin - Delete user
+# ✅ Admin - Delete user
 # ===========================
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_delete_user(
@@ -150,7 +185,7 @@ async def admin_delete_user(
     return None
 
 # ===========================
-# ✅ NEW: Admin - System summary report
+# ✅ Admin - System summary report
 # ===========================
 @router.get("/reports/summary", response_model=SystemSummaryReport)
 async def admin_system_summary(
@@ -202,7 +237,7 @@ async def admin_system_summary(
     )
 
 # ===========================
-# ✅ NEW: Admin - List all classes (search + pagination)
+# ✅ Admin - List all classes (search + pagination)
 # ===========================
 @router.get("/classes", response_model=AdminClassesPage)
 async def admin_list_classes(
@@ -264,6 +299,7 @@ async def admin_list_classes(
                     updated_at=teacher.updated_at,
                     last_login_at=teacher.last_login_at,
                     roles=[r.name for r in teacher.roles],
+                    avatar_url=getattr(teacher, "avatar_url", None),  # ✅ ส่ง avatar_url
                 ) if teacher else None,
             )
         )
@@ -273,4 +309,75 @@ async def admin_list_classes(
         limit=limit,
         offset=offset,
         items=items,
+    )
+# ===========================
+# ✅ Admin - Create class (แก้ 500 จาก code = NULL)
+# ===========================
+@router.post("/classes", response_model=AdminClassSummary, status_code=status.HTTP_201_CREATED)
+def admin_create_class(
+    payload: AdminCreateClass,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin_user),
+):
+    # ตรวจสอบครู
+    teacher = db.query(User).filter(User.user_id == payload.teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    role_names = {r.name.lower() for r in teacher.roles}
+    if "teacher" not in role_names and "admin" not in role_names:
+        raise HTTPException(status_code=400, detail="The provided user is not a teacher/admin")
+
+    # เตรียม code: ใช้จาก payload หรือ gen ใหม่
+    code: str
+    if payload.code and payload.code.strip():
+        code = payload.code.strip().upper()
+        exists = (
+            db.query(ClassModel)
+            .filter(func.lower(ClassModel.code) == code.lower())
+            .first()
+        )
+        if exists:
+            raise HTTPException(status_code=409, detail="Class code already exists")
+    else:
+        code = _generate_unique_class_code(db)
+
+    now = datetime.utcnow()
+
+    # สร้างคลาสใหม่ — ใส่ code ให้ไม่ NULL และไม่ซ้ำ
+    new_class = ClassModel(
+        name=payload.name.strip(),
+        code=code,
+        description=payload.description,
+        teacher_id=payload.teacher_id,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        created_at=now,
+        updated_at=now,
+    )
+
+    db.add(new_class)
+    db.commit()
+    db.refresh(new_class)
+
+    return AdminClassSummary(
+        class_id=new_class.class_id,
+        name=new_class.name,
+        code=new_class.code,
+        student_count=0,
+        created_at=new_class.created_at or now,
+        teacher=UserResponse(
+            user_id=teacher.user_id,
+            username=teacher.username,
+            first_name=teacher.first_name,
+            last_name=teacher.last_name,
+            email=teacher.email,
+            is_active=teacher.is_active,
+            is_approved=getattr(teacher, "is_approved", None),
+            created_at=teacher.created_at,
+            updated_at=teacher.updated_at,
+            last_login_at=teacher.last_login_at,
+            roles=[r.name for r in teacher.roles],
+            avatar_url=getattr(teacher, "avatar_url", None),
+        ),
     )

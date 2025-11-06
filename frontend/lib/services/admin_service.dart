@@ -75,8 +75,8 @@ class AdminService {
     return SystemSummary.fromJson(json.decode(res.body));
   }
 
-
-    static Future<Map<String, dynamic>> listClasses({
+  // GET /admin/classes — รายการคลาสทั้งหมด (เพจ)
+  static Future<Map<String, dynamic>> listClasses({
     String? q,
     int limit = 50,
     int offset = 0,
@@ -93,10 +93,45 @@ class AdminService {
         .get(uri, headers: await _headers())
         .timeout(_timeout);
     if (res.statusCode != 200) {
-      throw Exception('Failed to load classes: ${res.body}');
+      throw Exception('ดึงรายการคลาสไม่สำเร็จ: ${res.body}');
     }
     final data = json.decode(res.body);
     if (data is Map<String, dynamic>) return data;
-    throw Exception('Invalid response for classes');
+    throw Exception('รูปแบบข้อมูลคลาสไม่ถูกต้อง');
+  }
+
+  // POST /admin/classes — เพิ่มคลาส (แอดมิน)
+  static Future<Map<String, dynamic>> createClass({
+    required String name,
+    required String teacherId,
+    String? startTimeIso,
+    String? endTimeIso,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/admin/classes');
+    final body = {
+      'name': name,
+      'teacher_id': teacherId,
+      if (startTimeIso != null && startTimeIso.isNotEmpty)
+        'start_time': startTimeIso,
+      if (endTimeIso != null && endTimeIso.isNotEmpty) 'end_time': endTimeIso,
+    };
+    final res = await http
+        .post(uri, headers: await _headers(), body: json.encode(body))
+        .timeout(_timeout);
+    if (res.statusCode != 201) {
+      throw Exception('เพิ่มคลาสไม่สำเร็จ: ${res.body}');
+    }
+    return json.decode(res.body) as Map<String, dynamic>;
+  }
+
+  // DELETE /admin/classes/{class_id} — ลบคลาส (แอดมิน)
+  static Future<void> deleteClass(String classId) async {
+    final uri = Uri.parse('$_baseUrl/admin/classes/$classId');
+    final res = await http
+        .delete(uri, headers: await _headers())
+        .timeout(_timeout);
+    if (res.statusCode != 204) {
+      throw Exception('ลบคลาสไม่สำเร็จ: ${res.body}');
+    }
   }
 }

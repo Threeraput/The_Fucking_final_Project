@@ -3,6 +3,8 @@ import 'package:frontend/services/auth_service.dart';
 import 'package:frontend/models/users.dart';
 import 'package:frontend/models/admin.dart';
 import 'package:frontend/services/admin_service.dart';
+// ✅ ใช้สำหรับ URL รูปโปรไฟล์จริง
+import 'package:frontend/services/user_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -48,6 +50,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     _tab.dispose();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  // ✅ helper แสดงรูปโปรไฟล์จริง ถ้าไม่มีใช้ตัวอักษรแรกแทน
+  CircleAvatar _avatarFor(User u, {double radius = 20}) {
+    final abs = UserService.absoluteAvatarUrl(u.avatarUrl);
+    if (abs != null && abs.isNotEmpty) {
+      return CircleAvatar(radius: radius, backgroundImage: NetworkImage(abs));
+    }
+    final initial =
+        (u.username.isNotEmpty
+                ? u.username[0]
+                : (u.email?.isNotEmpty == true ? u.email![0] : '?'))
+            .toUpperCase();
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade300,
+      child: Text(initial, style: const TextStyle(color: Colors.black87)),
+    );
   }
 
   Future<void> _guardAndLoad() async {
@@ -221,7 +241,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   final u = items[i];
                   final rolesLabel = (u.roles).join(', ');
                   return ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    leading: _avatarFor(u, radius: 20), // ✅ ใช้รูปจริง
                     title: Text(u.displayName),
                     subtitle: Text('${u.email ?? '-'}  •  $rolesLabel'),
                     trailing: IconButton(
@@ -426,7 +446,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         itemBuilder: (context, index) {
           final user = _pendingTeachers[index];
           return ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
+            leading: _avatarFor(user, radius: 20), // ✅ ใช้รูปจริง
             title: Text(user.displayName),
             subtitle: Text('อีเมล: ${user.email ?? '-'}'),
             trailing: ElevatedButton(
@@ -470,3 +490,4 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 }
+ 

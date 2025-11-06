@@ -14,7 +14,7 @@ import 'package:frontend/screens/profile_screen.dart';
 import 'package:frontend/services/user_service.dart';
 import 'package:frontend/screens/admin_dashboard_screen.dart';
 
-// ✅ ใช้ API แอดมินสำหรับดึงคลาสทั้งหมดในระบบ
+// ✅ ใช้ API แอดมินสำหรับดึง/เพิ่ม/ลบคลาสทั้งหมดในระบบ
 import 'package:frontend/services/admin_service.dart';
 
 class ClassroomHomeScreen extends StatefulWidget {
@@ -47,13 +47,11 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
 
   void _setupFutures() {
     if (_isAdmin) {
-      // ✅ ถ้าเป็นแอดมิน: แทนที่ด้วยการโหลด "ทุกคลาสในระบบ"
       _futureAllClasses = _fetchAllClassesForAdmin();
       _futureTaught = null;
       _futureJoined = null;
       return;
     }
-
     if (_isTeacher) {
       _futureTaught = ClassService.getTaughtClasses();
       _futureJoined = null;
@@ -64,14 +62,12 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   }
 
   Future<void> _loadMe() async {
-    // โหลดจาก local ก่อน เพื่อไม่ให้หน้าว่าง
     final cached = await AuthService.getCurrentUserFromLocal();
     setState(() {
       _me = cached;
       _setupFutures();
     });
 
-    // แล้วพยายามโหลดข้อมูลสด (เพื่อให้ได้ avatarUrl ล่าสุด)
     try {
       final fresh = await UserService.fetchMe();
       if (!mounted) return;
@@ -79,9 +75,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         _me = fresh;
         _setupFutures();
       });
-    } catch (_) {
-      // เงียบไว้ ใช้ค่า cached ไปก่อน
-    }
+    } catch (_) {}
   }
 
   Future<void> _refresh() async {
@@ -95,7 +89,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       context,
     ).push<bool>(MaterialPageRoute(builder: (_) => const CreateClassScreen()));
     if (created == true) {
-      _refresh(); // รีเฟรชทันทีเมื่อสร้างสำเร็จ
+      _refresh();
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -125,7 +119,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       context,
     ).push<bool>(MaterialPageRoute(builder: (_) => const ProfileScreen()));
     if (changed == true) {
-      // กลับมาแล้วรีเฟรช เพื่อให้รูปใหม่แสดงทันที
       await _loadMe();
     }
   }
@@ -143,7 +136,7 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   }
 
   // =========================
-  // ✅ ADMIN: โหลดคลาสทั้งหมดในระบบผ่าน AdminService
+  // ✅ ADMIN: โหลดคลาสทั้งหมดในระบบ
   // =========================
   Future<List<_AdminClassItem>> _fetchAllClassesForAdmin() async {
     final page = await AdminService.listClasses(limit: 200, offset: 0);
@@ -156,19 +149,130 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         name: (m['name'] ?? '').toString(),
         code: (m['code'] ?? '').toString(),
         studentCount: (m['student_count'] ?? 0) as int,
-        teacherName: (teacher['username'] ??
-                teacher['full_name'] ??
-                teacher['email'] ??
-                '-')
-            .toString(),
+        teacherName:
+            (teacher['username'] ??
+                    teacher['full_name'] ??
+                    teacher['email'] ??
+                    '-')
+                .toString(),
       );
     }).toList();
+  }
+
+  // =========================
+  // ✅ ADMIN: เพิ่มคลาสใหม่ (ชื่อ + teacher_id)
+  // =========================
+  Future<void> _adminCreateClass() async {
+    final nameCtrl = TextEditingController();
+    final teacherIdCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('เพิ่มคลาส (แอดมิน)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อคลาส',
+                prefixIcon: Icon(Icons.class_),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: teacherIdCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Teacher ID (UUID)',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              style: TextStyle(color: Colors.grey),
+              'ยกเลิก'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.blueAccent),
+            icon: const Icon(Icons.add),
+            onPressed: () => Navigator.pop(ctx, true),
+            label: const Text('เพิ่ม'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final name = nameCtrl.text.trim();
+      final teacherId = teacherIdCtrl.text.trim();
+      if (name.isEmpty || teacherId.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรอกชื่อคลาสและ Teacher ID ให้ครบ')),
+        );
+        return;
+      }
+      try {
+        await AdminService.createClass(name: name, teacherId: teacherId);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('เพิ่มคลาสสำเร็จ')));
+        _refresh();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('เพิ่มคลาสไม่สำเร็จ: $e')));
+      }
+    }
+  }
+
+  // =========================
+  // ✅ ADMIN: ลบคลาส
+  // =========================
+  Future<void> _adminDeleteClass(String classId, String className) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ยืนยันการลบคลาส'),
+        content: Text('ต้องการลบ "$className" ใช่หรือไม่?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      try {
+        await AdminService.deleteClass(classId);
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('ลบคลาสสำเร็จ')));
+        _refresh();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('ลบคลาสไม่สำเร็จ: $e')));
+      }
+    }
   }
 
   Drawer _buildDrawer() {
     final me = _me;
 
-    // ถ้ายังโหลดข้อมูล user ไม่เสร็จ — ไม่แสดง Drawer
     if (me == null) {
       return const Drawer(
         child: Center(
@@ -179,7 +283,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       );
     }
 
-    // เช็คว่าเป็น student หรือไม่
     final isStudent = me.roles.any((r) => r.toLowerCase() == 'student');
     final avatarAbs = UserService.absoluteAvatarUrl(me.avatarUrl);
 
@@ -187,19 +290,19 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
       child: SafeArea(
         child: Column(
           children: [
-            // 🔹 ส่วนหัว — แตะรูปเพื่อไปหน้าโปรไฟล์
             UserAccountsDrawerHeader(
               accountName: Text(me.displayName),
               accountEmail: Text(me.email ?? ''),
               currentAccountPicture: GestureDetector(
                 onTap: () async {
-                  Navigator.pop(context); // ปิด drawer ก่อน
+                  Navigator.pop(context);
                   await _openProfile();
                 },
                 child: CircleAvatar(
                   backgroundColor: Colors.deepOrangeAccent,
-                  backgroundImage:
-                      avatarAbs != null ? NetworkImage(avatarAbs) : null,
+                  backgroundImage: avatarAbs != null
+                      ? NetworkImage(avatarAbs)
+                      : null,
                   child: avatarAbs == null
                       ? Text(
                           (me.username.isNotEmpty ? me.username[0] : '?')
@@ -221,23 +324,25 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               ),
             ),
 
-            // 🔹 เมนูหลัก
             Expanded(
               child: ListView(
                 children: [
                   ListTile(
                     leading: const Icon(Icons.class_, color: Colors.blueAccent),
-                    title: Text(_isAdmin
-                        ? 'คลาสทั้งหมด (แอดมิน)'
-                        : (_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน')),
+                    title: Text(
+                      _isAdmin
+                          ? 'คลาสทั้งหมด (แอดมิน)'
+                          : (_isTeacher ? 'คลาสที่สอน' : 'คลาสที่เรียน'),
+                    ),
                     onTap: () => Navigator.pop(context),
                   ),
-
                   if (_isAdmin) ...[
                     const Divider(),
                     const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       child: Text(
                         'ADMIN',
                         style: TextStyle(
@@ -259,10 +364,8 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                       },
                     ),
                   ],
-
                   const Divider(),
 
-                  // 🔹 เมนูเฉพาะอาจารย์
                   if (_isTeacher && !_isAdmin)
                     ListTile(
                       leading: const Icon(Icons.add_circle_outline),
@@ -273,7 +376,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                       },
                     ),
 
-                  // 🔹 เมนูเฉพาะนักเรียน
                   if (!_isTeacher && !_isAdmin)
                     ListTile(
                       leading: const Icon(Icons.group_add),
@@ -284,7 +386,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                       },
                     ),
 
-                  // 🔹 เพิ่ม/ลบใบหน้า — เฉพาะนักเรียน
                   if (isStudent) ...[
                     const Divider(),
                     ListTile(
@@ -299,84 +400,30 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                       title: const Text('ลบใบหน้า'),
                       onTap: () async {
                         Navigator.pop(context);
-
                         final confirmed = await showDialog<bool>(
                           context: context,
-                          builder: (ctx) {
-                            // ดึงขนาดหน้าจอ
-                            final screenWidth = MediaQuery.of(ctx).size.width;
-
-                            // ปรับขนาดอักษรและระยะห่างตามขนาดหน้าจอ
-                            final titleFontSize = screenWidth * 0.045;
-                            final contentFontSize = screenWidth * 0.04;
-                            final buttonFontSize = screenWidth * 0.04;
-                            final paddingSize = screenWidth * 0.04;
-
-                            return AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('ยืนยันการลบข้อมูลใบหน้า'),
+                            content: const Text(
+                              'การกระทำนี้ไม่สามารถกู้คืนได้',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text(
+                                  style: TextStyle(color: Colors.grey),
+                                  'ยกเลิก'),
                               ),
-                              title: Center(
-                                child: Text(
-                                  'ยืนยันการลบข้อมูลใบหน้า',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: titleFontSize,
-                                  ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
                                 ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('ลบ'),
                               ),
-                              content: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: paddingSize * 0.5,
-                                ),
-                                child: RichText(
-                                  textAlign: TextAlign.center,
-                                  text: const TextSpan(
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      height: 1.4,
-                                      color: Colors.black87,
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text:
-                                            'คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลใบหน้าของคุณออกจากระบบ?\n',
-                                      ),
-                                      TextSpan(
-                                        text: 'การกระทำนี้ ',
-                                      ),
-                                      TextSpan(
-                                        text: 'ไม่สามารถกู้คืนได้',
-                                        style: TextStyle(
-                                          color: Colors.redAccent,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              actionsAlignment: MainAxisAlignment.spaceEvenly,
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text(
-                                    'ยกเลิก',
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                                FilledButton(
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('ลบ'),
-                                ),
-                              ],
-                            );
-                          },
+                            ],
+                          ),
                         );
-
                         if (confirmed == true) {
                           try {
                             await FaceService.deleteFace();
@@ -404,7 +451,6 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
 
             const Divider(),
 
-            // 🔹 ปุ่มออกจากระบบ
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 12.0,
@@ -421,84 +467,27 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
                   ),
                 ),
                 onTap: () async {
-                  final screenWidth = MediaQuery.of(context).size.width;
-                  final isSmallScreen = screenWidth < 400;
-
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
                       title: const Text(
-                        'ยืนยันการออกจากระบบ',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
+                        'ยืนยันการออกจากระบบ'),
+                      content: const Text(
+                        'คุณต้องเข้าสู่ระบบอีกครั้งเพื่อใช้งานต่อ',
                       ),
-                      content: RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.black87,
-                            height: 1.5,
-                          ),
-                          children: const [
-                            TextSpan(text: 'คุณแน่ใจหรือไม่ว่าต้องการ\n'),
-                            TextSpan(
-                              text: 'ออกจากระบบ',
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextSpan(text: '?\nหากคุณดำเนินการ ต้อง'),
-                            TextSpan(
-                              text: 'เข้าสู่ระบบ',
-                              style: TextStyle(
-                                color: Colors.black87,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextSpan(text: ' อีกครั้งเพื่อใช้งานระบบต่อ'),
-                          ],
-                        ),
-                      ),
-                      actionsPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      actionsAlignment: MainAxisAlignment.spaceBetween,
                       actions: [
                         TextButton(
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.grey[700],
-                            overlayColor: Colors.transparent, // ❌ ไม่มีสีตอนกด
-                          ),
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: Text(
-                            'ยกเลิก',
-                            style: TextStyle(fontSize: isSmallScreen ? 14 : 15),
-                          ),
+                          child: const Text(
+                          style: TextStyle(color: Colors.grey),
+                            'ยกเลิก'),
                         ),
                         FilledButton(
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.redAccent,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 16 : 20,
-                              vertical: 10,
-                            ),
                           ),
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: Text(
-                            'ออกจากระบบ',
-                            style: TextStyle(
-                              fontSize: isSmallScreen ? 14 : 15,
-                              color: Colors.white,
-                            ),
-                          ),
+                          child: const Text('ออกจากระบบ'),
                         ),
                       ],
                     ),
@@ -523,14 +512,14 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final me = _me;
-    final avatarAbs =
-        me != null ? UserService.absoluteAvatarUrl(me.avatarUrl) : null;
+    final avatarAbs = me != null
+        ? UserService.absoluteAvatarUrl(me.avatarUrl)
+        : null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(_isAdmin ? 'All Classes (Admin)' : 'Classroom'),
         actions: [
-          // ✅ รูปโปรไฟล์กลมๆ ทางขวาบนของ AppBar
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(
@@ -538,8 +527,9 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               child: CircleAvatar(
                 radius: 16,
                 backgroundColor: Colors.grey.shade300,
-                backgroundImage:
-                    (avatarAbs != null) ? NetworkImage(avatarAbs) : null,
+                backgroundImage: (avatarAbs != null)
+                    ? NetworkImage(avatarAbs)
+                    : null,
                 child: (avatarAbs == null)
                     ? Icon(Icons.person, color: Colors.grey.shade700)
                     : null,
@@ -549,14 +539,23 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
         ],
       ),
       drawer: _buildDrawer(),
-      floatingActionButton: (!_isAdmin)
-          ? FloatingActionButton(
+      // ✅ แอดมิน: มีปุ่มเพิ่มคลาสเท่านั้น
+      floatingActionButton: _isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _adminCreateClass,
+              backgroundColor: Colors.blueAccent,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'เพิ่มคลาส',
+                style: TextStyle(color: Colors.white),
+              ),
+            )
+          : FloatingActionButton(
               onPressed: _isTeacher ? _openCreate : _openJoin,
               tooltip: _isTeacher ? 'สร้างคลาสใหม่' : 'เข้าร่วมคลาส',
               backgroundColor: Colors.blueAccent,
               child: const Icon(Icons.add, color: Colors.white),
-            )
-          : null,
+            ),
       body: me == null
           ? const Center(
               child: CircularProgressIndicator(
@@ -564,19 +563,20 @@ class _ClassroomHomeScreenState extends State<ClassroomHomeScreen> {
               ),
             )
           : _isAdmin
-              ? _AdminClasses(
-                  futureAll: _futureAllClasses,
-                  onRefresh: _refresh,
-                )
-              : (_isTeacher
-                  ? _TeacherClasses(
-                      futureTaught: _futureTaught,
-                      onRefresh: _refresh,
-                    )
-                  : _StudentClasses(
-                      futureJoined: _futureJoined,
-                      onRefresh: _refresh,
-                    )),
+          ? _AdminClasses(
+              futureAll: _futureAllClasses,
+              onDelete: _adminDeleteClass,
+              onRefresh: _refresh,
+            )
+          : (_isTeacher
+                ? _TeacherClasses(
+                    futureTaught: _futureTaught,
+                    onRefresh: _refresh,
+                  )
+                : _StudentClasses(
+                    futureJoined: _futureJoined,
+                    onRefresh: _refresh,
+                  )),
     );
   }
 }
@@ -666,7 +666,12 @@ class _StudentClasses extends StatelessWidget {
 class _AdminClasses extends StatelessWidget {
   final Future<List<_AdminClassItem>>? futureAll;
   final Future<void> Function() onRefresh;
-  const _AdminClasses({required this.futureAll, required this.onRefresh});
+  final Future<void> Function(String classId, String className) onDelete;
+  const _AdminClasses({
+    required this.futureAll,
+    required this.onRefresh,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -687,7 +692,7 @@ class _AdminClasses extends StatelessWidget {
         if (data.isEmpty) {
           return const _EmptyState(
             title: 'ยังไม่มีคลาสในระบบ',
-            subtitle: 'เริ่มสร้างคลาสแรกจาก Admin Dashboard',
+            subtitle: 'กดปุ่ม “เพิ่มคลาส” ที่มุมขวาล่าง',
           );
         }
 
@@ -701,13 +706,16 @@ class _AdminClasses extends StatelessWidget {
               final color = getClassColor(it.name);
               return Card(
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 3,
                 color: color,
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   title: Text(
                     it.name,
                     style: const TextStyle(
@@ -718,22 +726,16 @@ class _AdminClasses extends StatelessWidget {
                   ),
                   subtitle: Text(
                     'Teacher: ${it.teacherName}  •  Students: ${it.studentCount}',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.92),
-                    ),
+                    style: TextStyle(color: Colors.white.withOpacity(0.92)),
                   ),
-                  trailing: const Icon(Icons.arrow_forward_ios,
-                      color: Colors.white, size: 16),
-                  onTap: () {
-                    // เปิดหน้า class — แนะนำใช้ ClassDetailsScreen (แอดมินถือเป็น teacher view)
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ClassDetailsScreen(classId: it.classId),
-                      ),
-                    );
-                  },
+                  // ✅ แอดมิน: มีปุ่มลบเท่านั้น
+                  trailing: IconButton(
+                    tooltip: 'ลบคลาส',
+                    onPressed: () => onDelete(it.classId, it.name),
+                    icon: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  // ❌ ไม่พาเข้า class details สำหรับแอดมินในหน้านี้
+                  onTap: null,
                 ),
               );
             },
@@ -775,7 +777,6 @@ Color getClassColor(String? className, {int shade = 400}) {
   final baseColor =
       Colors.primaries[className.hashCode % Colors.primaries.length];
 
-  // shade ที่ต้องการ
   switch (shade) {
     case 100:
       return baseColor.shade100;
@@ -792,6 +793,7 @@ Color getClassColor(String? className, {int shade = 400}) {
   }
 }
 
+// การ์ดสำหรับครู/นักเรียน (ไม่ใช้กับแอดมิน)
 class _ClassCard extends StatelessWidget {
   final Classroom c;
   final bool isTeacher;
@@ -831,7 +833,6 @@ class _ClassCard extends StatelessWidget {
         },
         child: Stack(
           children: [
-            // 🔹 เมนู 3 จุดด้านบนขวา
             Positioned(
               top: 4,
               right: 4,
@@ -843,7 +844,6 @@ class _ClassCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert, color: Colors.white),
                 onSelected: (value) async {
                   if (value == 'edit') {
-                    // แก้ไขคลาส (เฉพาะอาจารย์)
                     final updated = await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -857,7 +857,6 @@ class _ClassCard extends StatelessWidget {
                       onRefresh?.call();
                     }
                   } else if (value == 'delete') {
-                    // ลบคลาส
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (_) => AlertDialog(
@@ -868,35 +867,19 @@ class _ClassCard extends StatelessWidget {
                           'ออกจากคลาส',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        content: Text(
-                          'ต้องการลบ "${c.name}" ใช่หรือไม่?',
-                          style: const TextStyle(fontSize: 15),
+                        content: const Text(
+                          'ต้องการลบคลาสนี้ใช่หรือไม่?',
+                          style: TextStyle(fontSize: 15),
                         ),
                         actionsAlignment: MainAxisAlignment.center,
                         actions: [
                           TextButton(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              textStyle: const TextStyle(fontSize: 14),
-                              foregroundColor: Colors.grey[700],
-                            ),
                             onPressed: () => Navigator.pop(context, false),
                             child: const Text('ยกเลิก'),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 10,
-                              ),
-                              textStyle: const TextStyle(fontSize: 14),
                               backgroundColor: Colors.redAccent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
                             ),
                             onPressed: () => Navigator.pop(context, true),
                             child: const Text('ลบ'),
@@ -920,15 +903,11 @@ class _ClassCard extends StatelessWidget {
                       }
                     }
                   } else if (value == 'leave') {
-                    // นักเรียนออกจากคลาส
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (_) => AlertDialog(
                         title: const Text('ออกจากคลาส'),
-                        content: Text(
-                          'ต้องการออกจาก "${c.name}" ใช่หรือไม่?',
-                          style: const TextStyle(fontSize: 13),
-                        ),
+                        content: const Text('ต้องการออกจากคลาสนี้ใช่หรือไม่?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context, false),
@@ -939,16 +918,7 @@ class _ClassCard extends StatelessWidget {
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              minimumSize: const Size(0, 36),
-                              textStyle: const TextStyle(fontSize: 14),
                               backgroundColor: Colors.redAccent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
                             ),
                             onPressed: () => Navigator.pop(context, true),
                             child: const Text('ออกจากคลาส'),
@@ -982,10 +952,6 @@ class _ClassCard extends StatelessWidget {
                     : [
                         const PopupMenuItem(
                           value: 'leave',
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
                           height: 28,
                           child: Text(
                             'ออกจากคลาส',
@@ -995,8 +961,6 @@ class _ClassCard extends StatelessWidget {
                       ],
               ),
             ),
-
-            // 🔹 ส่วนเนื้อหาเดิมทั้งหมด
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -1025,7 +989,6 @@ class _ClassCard extends StatelessWidget {
   }
 }
 
-// ✅ โครงสร้างข้อมูลคลาสแบบย่อสำหรับแอดมิน (มาจาก /admin/classes)
 class _AdminClassItem {
   final String classId;
   final String name;

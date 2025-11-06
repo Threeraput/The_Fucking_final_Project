@@ -2,7 +2,7 @@
 import io
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional , Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -242,3 +242,21 @@ def manual_override_attendance(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save manual override: {e}")
+    
+def identify_user(image_bytes: bytes) -> Tuple[Optional[uuid.UUID], Optional[float]]:
+    """
+    รู้จำว่ารูปนี้คือผู้ใช้คนไหนในระบบ + คะแนนความเหมือน
+    ต้องผูกกับโมเดล/ฐานข้อมูลหน้าใบหน้าของคุณเอง
+
+    Return:
+      (user_id, score) หรือ (None, None) ถ้าไม่พบ
+    """
+    # TODO: ใช้ embedding จากโมเดล แล้วเทียบกับฐาน embeddings ของ users
+    # - ถ้ามีฟังก์ชัน recognize(image) อยู่แล้ว ให้เรียกใช้แทน และ map ค่าที่คืนเป็น (user_id, score)
+    # - หากใช้โหมด verify-only: ให้ย้ายตรรกะไป verify_user_identity(expected_user_id, image_bytes) ก็ได้
+    # ตัวอย่างโครง (pseudo):
+    # embedding = face_model.encode(image_bytes)
+    # user_id, score = faces_index.search_top1(embedding)  # best match
+    # if score < some_threshold: return (None, score)
+    # return (user_id, score)
+    raise NotImplementedError("identify_user must be implemented to return (user_id, score)")

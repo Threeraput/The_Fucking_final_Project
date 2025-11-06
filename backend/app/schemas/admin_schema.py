@@ -21,6 +21,15 @@ class AdminClassesPage(BaseModel):
     offset: int
     items: List[AdminClassSummary] = []
 
+# ✅ ใช้ตอนสร้างคลาสใหม่
+class AdminCreateClass(BaseModel):
+    name: str
+    teacher_id: uuid.UUID
+    code: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+
 class AdminUsersPage(BaseModel):
     total: int
     limit: int

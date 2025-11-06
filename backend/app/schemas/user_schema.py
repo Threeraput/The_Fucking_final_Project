@@ -28,6 +28,7 @@ class UserPublic(BaseModel):
     avatar_url: Optional[str] = None
     # เก็บ role เป็นชื่อ string
     roles: List[str] = Field(default_factory=list)
+    avatar_url: Optional[str] = None
 
 
 # ---------------------------
