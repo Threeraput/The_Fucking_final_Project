@@ -248,6 +248,7 @@ class _FeedCard extends StatelessWidget {
           children: [
             _HeaderRow(
               icon: Icons.access_time,
+              iconColor: Colors.blueAccent,
               title: title,
               dateText: dfTime.format(item.postedAt.toLocal()),
             ),
@@ -461,22 +462,23 @@ class _HeaderRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String dateText;
+  final Color iconColor;
 
   const _HeaderRow({
     required this.icon,
     required this.title,
     required this.dateText,
+    required this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.inverseSurface;
     return Row(
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: Colors.blue,
-          child: Icon(icon, size: 18, color: Colors.white),
+          backgroundColor: iconColor.withOpacity(0.1),
+          child: Icon(icon, size: 18, color: iconColor), 
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -524,6 +526,7 @@ class _AnnouncementCard extends StatelessWidget {
           children: [
             _HeaderRow(
               icon: pinned ? Icons.push_pin : Icons.campaign_outlined,
+              iconColor: pinned ? Colors.red : Colors.blueGrey,
               title: pinned ? '[ปักหมุด] $title' : title,
               dateText: df.format(postedAt.toLocal()),
             ),
