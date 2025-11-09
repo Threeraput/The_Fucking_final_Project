@@ -187,20 +187,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           child: Row(
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'ค้นหา username / email / ชื่อ',
-                    prefixIcon: const Icon(Icons.search),
-                    isDense: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onSubmitted: (_) => _loadUsers(reset: true),
-                ),
-              ),
+              // Expanded(
+              //   child: TextField(
+              //     controller: _searchCtrl,
+              //     decoration: InputDecoration(
+              //       hintText: 'ค้นหา username / email / ชื่อ',
+              //       prefixIcon: const Icon(Icons.search),
+              //       isDense: true,
+              //       border: OutlineInputBorder(
+              //         borderRadius: BorderRadius.circular(10),
+              //       ),
+              //     ),
+              //     onSubmitted: (_) => _loadUsers(reset: true),
+              //   ),
+              // ),
               const SizedBox(width: 8),
               DropdownButton<String>(
                 value: _role,
@@ -347,30 +347,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       padding: const EdgeInsets.all(16),
       children: [
         Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _pickRange,
-                icon: const Icon(Icons.event),
-                label: Text(
-                  (_start != null && _end != null)
-                      ? '${_start!.toLocal().toString().substring(0, 10)} - ${_end!.toLocal().toString().substring(0, 10)}'
-                      : 'เลือกช่วงเวลา',
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _start = null;
-                  _end = null;
-                });
-                _loadSummary();
-              },
-              child: const Text('ล้างช่วงเวลา'),
-            ),
-          ],
+          // children: [
+          //   Expanded(
+          //     child: OutlinedButton.icon(
+          //       onPressed: _pickRange,
+          //       icon: const Icon(Icons.event),
+          //       label: Text(
+          //         (_start != null && _end != null)
+          //             ? '${_start!.toLocal().toString().substring(0, 10)} - ${_end!.toLocal().toString().substring(0, 10)}'
+          //             : 'เลือกช่วงเวลา',
+          //       ),
+          //     ),
+          //   ),
+          //   const SizedBox(width: 8),
+          //   TextButton(
+          //     onPressed: () {
+          //       setState(() {
+          //         _start = null;
+          //         _end = null;
+          //       });
+          //       _loadSummary();
+          //     },
+          //     child: const Text('ล้างช่วงเวลา'),
+          //   ),
+          // ],
         ),
         const SizedBox(height: 12),
         Wrap(
